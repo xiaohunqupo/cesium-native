@@ -1,8 +1,15 @@
 #include <CesiumGeometry/Transforms.h>
+#include <CesiumGeospatial/Ellipsoid.h>
 #include <CesiumGeospatial/GlobeAnchor.h>
 #include <CesiumGeospatial/LocalHorizontalCoordinateSystem.h>
+#include <CesiumUtility/Math.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <glm/ext/matrix_double3x3.hpp>
+#include <glm/ext/matrix_double4x4.hpp>
+#include <glm/ext/quaternion_trigonometric.hpp>
+#include <glm/ext/vector_double3.hpp>
+#include <glm/fwd.hpp>
 #include <glm/gtx/quaternion.hpp>
 
 using namespace CesiumGeometry;
@@ -16,13 +23,17 @@ TEST_CASE("GlobeAnchor") {
       nullIsland,
       LocalDirection::East,
       LocalDirection::Up,
-      LocalDirection::North);
+      LocalDirection::North,
+      1.0,
+      Ellipsoid::WGS84);
 
   LocalHorizontalCoordinateSystem leftHandedEastUpNorth90(
       Cartographic::fromDegrees(90.0, 0.0, 0.0),
       LocalDirection::East,
       LocalDirection::Up,
-      LocalDirection::North);
+      LocalDirection::North,
+      1.0,
+      Ellipsoid::WGS84);
 
   SECTION("Identity transform in local is equivalent to the local") {
     GlobeAnchor anchor = GlobeAnchor::fromAnchorToLocalTransform(
@@ -134,7 +145,11 @@ TEST_CASE("GlobeAnchor") {
     // Moving without adjusting orientation should leave the orientation
     // unchanged.
     GlobeAnchor first = anchor;
-    first.setAnchorToLocalTransform(leftHandedEastUpNorth90, toLocal, false);
+    first.setAnchorToLocalTransform(
+        leftHandedEastUpNorth90,
+        toLocal,
+        false,
+        Ellipsoid::WGS84);
     glm::dmat3 rotationScaleAfter =
         glm::dmat3(first.getAnchorToLocalTransform(leftHandedEastUpNorth90));
     CHECK(Math::equalsEpsilon(
@@ -155,7 +170,11 @@ TEST_CASE("GlobeAnchor") {
 
     // But if we allow adjusting orientation, the object should stay upright.
     GlobeAnchor second = anchor;
-    second.setAnchorToLocalTransform(leftHandedEastUpNorth90, toLocal, true);
+    second.setAnchorToLocalTransform(
+        leftHandedEastUpNorth90,
+        toLocal,
+        true,
+        Ellipsoid::WGS84);
     rotationScaleAfter =
         glm::dmat3(second.getAnchorToLocalTransform(leftHandedEastUpNorth90));
     glm::dmat3 expected = glm::dmat3(

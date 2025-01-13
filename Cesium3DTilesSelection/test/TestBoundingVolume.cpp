@@ -1,7 +1,14 @@
 #include <Cesium3DTilesSelection/BoundingVolume.h>
+#include <CesiumGeometry/BoundingSphere.h>
+#include <CesiumGeometry/OrientedBoundingBox.h>
 #include <CesiumGeometry/QuadtreeTileID.h>
+#include <CesiumGeospatial/BoundingRegion.h>
+#include <CesiumGeospatial/BoundingRegionWithLooseFittingHeights.h>
+#include <CesiumGeospatial/Ellipsoid.h>
+#include <CesiumGeospatial/S2CellBoundingVolume.h>
+#include <CesiumGeospatial/S2CellID.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 using namespace Cesium3DTilesSelection;
 using namespace CesiumGeometry;
@@ -30,7 +37,11 @@ TEST_CASE("getOrientedBoundingBoxFromBoundingVolume") {
   }
 
   SECTION("for others, their aggregated oriented bounding box is returned") {
-    BoundingRegion region(GlobeRectangle(0.5, 1.0, 1.5, 2.0), 100.0, 200.0);
+    BoundingRegion region(
+        GlobeRectangle(0.5, 1.0, 1.5, 2.0),
+        100.0,
+        200.0,
+        Ellipsoid::WGS84);
     BoundingVolume bv = region;
     OrientedBoundingBox newObb = getOrientedBoundingBoxFromBoundingVolume(bv);
     CHECK(region.getBoundingBox().getCenter() == newObb.getCenter());
@@ -45,7 +56,8 @@ TEST_CASE("getOrientedBoundingBoxFromBoundingVolume") {
     S2CellBoundingVolume s2(
         S2CellID::fromQuadtreeTileID(1, QuadtreeTileID(10, 1, 2)),
         100.0,
-        200.0);
+        200.0,
+        Ellipsoid::WGS84);
     bv = s2;
     newObb = getOrientedBoundingBoxFromBoundingVolume(bv);
     CHECK(

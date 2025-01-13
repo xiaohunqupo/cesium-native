@@ -1,6 +1,19 @@
 #include "dequantizeMeshData.h"
 
-#include <CesiumGltfReader/GltfReader.h>
+#include <CesiumGltf/Accessor.h>
+#include <CesiumGltf/AccessorSpec.h>
+#include <CesiumGltf/Buffer.h>
+#include <CesiumGltf/BufferView.h>
+#include <CesiumGltf/Mesh.h>
+#include <CesiumGltf/MeshPrimitive.h>
+#include <CesiumGltf/Model.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace CesiumGltf;
 
@@ -110,6 +123,7 @@ void dequantizeAccessor(Model& model, Accessor& accessor) {
   accessor.componentType = AccessorSpec::ComponentType::FLOAT;
   accessor.byteOffset = 0;
   accessor.bufferView = static_cast<int32_t>(model.bufferViews.size());
+  accessor.normalized = false;
 
   BufferView& bufferView = model.bufferViews.emplace_back(*pBufferView);
   bufferView.byteOffset = 0;
@@ -158,7 +172,7 @@ void dequantizeAccessor(Model& model, Accessor& accessor) {
 void dequantizeMeshData(Model& model) {
   for (Mesh& mesh : model.meshes) {
     for (MeshPrimitive& primitive : mesh.primitives) {
-      for (std::pair<const std::string, int32_t> attribute :
+      for (const std::pair<const std::string, int32_t>& attribute :
            primitive.attributes) {
         Accessor* pAccessor =
             Model::getSafe(&model.accessors, attribute.second);
@@ -170,11 +184,14 @@ void dequantizeMeshData(Model& model) {
         }
         const std::string& attributeName = attribute.first;
         if (attributeName == "POSITION" || attributeName == "NORMAL" ||
-            attributeName == "TANGENT" || attributeName.find("TEXCOORD") == 0) {
+            attributeName == "TANGENT" ||
+            attributeName.starts_with("TEXCOORD")) {
           dequantizeAccessor(model, *pAccessor);
         }
       }
     }
   }
+
+  model.removeExtensionRequired("KHR_mesh_quantization");
 }
 } // namespace CesiumGltfReader

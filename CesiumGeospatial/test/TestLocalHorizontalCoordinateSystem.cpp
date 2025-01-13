@@ -1,7 +1,9 @@
 #include <CesiumGeospatial/LocalHorizontalCoordinateSystem.h>
 #include <CesiumUtility/Math.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <glm/ext/matrix_double4x4.hpp>
+#include <glm/ext/vector_double3.hpp>
 
 using namespace CesiumGeospatial;
 using namespace CesiumUtility;
@@ -19,7 +21,9 @@ TEST_CASE("LocalHorizontalCoordinateSystem") {
         nullIsland,
         LocalDirection::East,
         LocalDirection::North,
-        LocalDirection::Up);
+        LocalDirection::Up,
+        1.0,
+        Ellipsoid::WGS84);
 
     CHECK(Math::equalsEpsilon(
         lh.ecefPositionToLocal(nullIslandEcef + oneMeterEastEcef),
@@ -45,7 +49,9 @@ TEST_CASE("LocalHorizontalCoordinateSystem") {
         nullIsland,
         LocalDirection::North,
         LocalDirection::East,
-        LocalDirection::Down);
+        LocalDirection::Down,
+        1.0,
+        Ellipsoid::WGS84);
 
     CHECK(Math::equalsEpsilon(
         lh.ecefPositionToLocal(nullIslandEcef + oneMeterEastEcef),
@@ -71,7 +77,9 @@ TEST_CASE("LocalHorizontalCoordinateSystem") {
         nullIsland,
         LocalDirection::East,
         LocalDirection::South,
-        LocalDirection::Up);
+        LocalDirection::Up,
+        1.0,
+        Ellipsoid::WGS84);
 
     CHECK(Math::equalsEpsilon(
         lh.ecefPositionToLocal(nullIslandEcef + oneMeterEastEcef),
@@ -97,7 +105,9 @@ TEST_CASE("LocalHorizontalCoordinateSystem") {
         nullIsland,
         LocalDirection::East,
         LocalDirection::Up,
-        LocalDirection::North);
+        LocalDirection::North,
+        1.0,
+        Ellipsoid::WGS84);
 
     CHECK(Math::equalsEpsilon(
         lh.ecefPositionToLocal(nullIslandEcef + oneMeterEastEcef),
@@ -124,7 +134,8 @@ TEST_CASE("LocalHorizontalCoordinateSystem") {
         LocalDirection::East,
         LocalDirection::South,
         LocalDirection::Up,
-        1.0 / 100.0);
+        1.0 / 100.0,
+        Ellipsoid::WGS84);
 
     CHECK(Math::equalsEpsilon(
         lh.ecefPositionToLocal(nullIslandEcef + oneMeterEastEcef),
@@ -150,13 +161,17 @@ TEST_CASE("LocalHorizontalCoordinateSystem") {
         nullIsland,
         LocalDirection::East,
         LocalDirection::South,
-        LocalDirection::Up);
+        LocalDirection::Up,
+        1.0,
+        Ellipsoid::WGS84);
 
     LocalHorizontalCoordinateSystem target(
         Cartographic::fromDegrees(12.0, 23.0, 1000.0),
         LocalDirection::East,
         LocalDirection::South,
-        LocalDirection::Up);
+        LocalDirection::Up,
+        1.0,
+        Ellipsoid::WGS84);
 
     glm::dvec3 somePointInOriginal = glm::dvec3(1781.0, 373.0, 7777.2);
     glm::dvec3 samePointInEcef =

@@ -1,11 +1,16 @@
-#include "CesiumGeospatial/BoundingRegion.h"
-#include "CesiumGeospatial/Ellipsoid.h"
-#include "CesiumGeospatial/GlobeRectangle.h"
-
+#include <CesiumGeometry/CullingResult.h>
 #include <CesiumGeometry/Plane.h>
+#include <CesiumGeospatial/BoundingRegion.h>
+#include <CesiumGeospatial/Ellipsoid.h>
+#include <CesiumGeospatial/GlobeRectangle.h>
 #include <CesiumUtility/Math.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <glm/ext/vector_double3.hpp>
+#include <glm/geometric.hpp>
+
+#include <cmath>
 
 using namespace CesiumUtility;
 using namespace CesiumGeometry;
@@ -37,7 +42,8 @@ TEST_CASE("BoundingRegion") {
     BoundingRegion region(
         GlobeRectangle(-0.001, -0.001, 0.001, 0.001),
         0.0,
-        10.0);
+        10.0,
+        Ellipsoid::WGS84);
 
     const GlobeRectangle& rectangle = region.getRectangle();
 
@@ -82,7 +88,8 @@ TEST_CASE("BoundingRegion") {
     glm::dvec3 position = Ellipsoid::WGS84.cartographicToCartesian(
         Cartographic(testCase.longitude, testCase.latitude, testCase.height));
     CHECK(Math::equalsEpsilon(
-        sqrt(region.computeDistanceSquaredToPosition(position)),
+        sqrt(region
+                 .computeDistanceSquaredToPosition(position, Ellipsoid::WGS84)),
         testCase.expectedDistance,
         Math::Epsilon6));
   }
@@ -110,7 +117,8 @@ TEST_CASE("BoundingRegion") {
     BoundingRegion region(
         GlobeRectangle(-1.03, 0.2292, -1.03, 0.2292),
         0.0,
-        3.0);
+        3.0,
+        Ellipsoid::WGS84);
 
     auto testCase = GENERATE_COPY(
         TestCase{-1.03, 0.2292, 4.0, 1.0},
@@ -121,13 +129,18 @@ TEST_CASE("BoundingRegion") {
     glm::dvec3 position = Ellipsoid::WGS84.cartographicToCartesian(
         Cartographic(testCase.longitude, testCase.latitude, testCase.height));
     CHECK(Math::equalsEpsilon(
-        sqrt(region.computeDistanceSquaredToPosition(position)),
+        sqrt(region
+                 .computeDistanceSquaredToPosition(position, Ellipsoid::WGS84)),
         testCase.expectedDistance,
         Math::Epsilon6));
   }
 
   SECTION("intersectPlane") {
-    BoundingRegion region(GlobeRectangle(0.0, 0.0, 1.0, 1.0), 0.0, 1.0);
+    BoundingRegion region(
+        GlobeRectangle(0.0, 0.0, 1.0, 1.0),
+        0.0,
+        1.0,
+        Ellipsoid::WGS84);
 
     Plane plane(
         glm::normalize(Ellipsoid::WGS84.cartographicToCartesian(

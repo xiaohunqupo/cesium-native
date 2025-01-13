@@ -1,9 +1,14 @@
 #include <CesiumGeometry/QuadtreeTileID.h>
-#include <CesiumGeospatial/Ellipsoid.h>
+#include <CesiumGeospatial/Cartographic.h>
+#include <CesiumGeospatial/GlobeRectangle.h>
 #include <CesiumGeospatial/S2CellID.h>
 #include <CesiumUtility/Math.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <glm/common.hpp>
+
+#include <array>
+#include <cstdint>
 
 using namespace CesiumGeometry;
 using namespace CesiumGeospatial;
@@ -90,11 +95,14 @@ TEST_CASE("S2CellID") {
     CHECK(Math::equalsEpsilon(center.height, 0.0, 0.0, Math::Epsilon10));
 
     center = S2CellID::fromToken("5").getCenter();
-    CHECK(Math::equalsEpsilon(
-        center.longitude,
-        Math::degreesToRadians(-180.0),
-        0.0,
-        Math::Epsilon10));
+    // The "longitude" of the south pole is a meaningless question, so the value
+    // the implementation returns is arbitrary, and in fact has changed between
+    // the prior version and 0.11.0 (the current version).
+    // CHECK(Math::equalsEpsilon(
+    //     center.longitude,
+    //     Math::degreesToRadians(0),
+    //     0.0,
+    //     Math::Epsilon10));
     CHECK(Math::equalsEpsilon(
         center.latitude,
         Math::degreesToRadians(90.0),
@@ -103,9 +111,11 @@ TEST_CASE("S2CellID") {
     CHECK(Math::equalsEpsilon(center.height, 0.0, 0.0, Math::Epsilon10));
 
     center = S2CellID::fromToken("7").getCenter();
+    // The "longitude" of the international dateline can either be -180 or 180,
+    // depending on the implementation, so we need to take the absolute value.
     CHECK(Math::equalsEpsilon(
-        center.longitude,
-        Math::degreesToRadians(-180.0),
+        glm::abs(center.longitude),
+        Math::degreesToRadians(180.0),
         0.0,
         Math::Epsilon10));
     CHECK(Math::equalsEpsilon(
@@ -129,11 +139,12 @@ TEST_CASE("S2CellID") {
     CHECK(Math::equalsEpsilon(center.height, 0.0, 0.0, Math::Epsilon10));
 
     center = S2CellID::fromToken("b").getCenter();
-    CHECK(Math::equalsEpsilon(
-        center.longitude,
-        Math::degreesToRadians(0.0),
-        0.0,
-        Math::Epsilon10));
+    // Don't validate the "longitude" of the south pole, as it's meaningless.
+    // CHECK(Math::equalsEpsilon(
+    //     center.longitude,
+    //     Math::degreesToRadians(0.0),
+    //     0.0,
+    //     Math::Epsilon10));
     CHECK(Math::equalsEpsilon(
         center.latitude,
         Math::degreesToRadians(-90.0),

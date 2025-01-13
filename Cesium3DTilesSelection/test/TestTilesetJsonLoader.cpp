@@ -1,72 +1,56 @@
+#include "TestTilesetJsonLoader.h"
+
 #include "ImplicitQuadtreeLoader.h"
 #include "SimplePrepareRendererResource.h"
+#include "TilesetContentLoaderResult.h"
 #include "TilesetJsonLoader.h"
 
+#include <Cesium3DTiles/Schema.h>
 #include <Cesium3DTilesContent/registerAllTileContentTypes.h>
+#include <Cesium3DTilesSelection/Tile.h>
+#include <Cesium3DTilesSelection/TileContent.h>
+#include <Cesium3DTilesSelection/TileLoadResult.h>
+#include <Cesium3DTilesSelection/TileRefine.h>
+#include <Cesium3DTilesSelection/TilesetContentLoader.h>
+#include <Cesium3DTilesSelection/TilesetMetadata.h>
+#include <CesiumAsync/AsyncSystem.h>
+#include <CesiumGeometry/Axis.h>
+#include <CesiumGeometry/BoundingSphere.h>
+#include <CesiumGeometry/OrientedBoundingBox.h>
+#include <CesiumGeospatial/BoundingRegion.h>
+#include <CesiumGltf/Model.h>
 #include <CesiumNativeTests/SimpleAssetAccessor.h>
 #include <CesiumNativeTests/SimpleAssetRequest.h>
 #include <CesiumNativeTests/SimpleAssetResponse.h>
 #include <CesiumNativeTests/SimpleTaskProcessor.h>
 #include <CesiumNativeTests/readFile.h>
+#include <CesiumUtility/CreditSystem.h>
 
 #include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <glm/ext/matrix_double3x3.hpp>
+#include <glm/ext/matrix_double4x4.hpp>
+#include <spdlog/spdlog.h>
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <map>
 #include <memory>
+#include <optional>
 #include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 using namespace CesiumAsync;
 using namespace Cesium3DTilesSelection;
 using namespace CesiumNativeTests;
+using namespace CesiumUtility;
 
 namespace {
 std::filesystem::path testDataPath = Cesium3DTilesSelection_TEST_DATA_DIR;
-
-TilesetExternals createMockTilesetExternals(const std::string& tilesetPath) {
-  auto tilesetContent = readFile(tilesetPath);
-  auto pMockCompletedResponse = std::make_unique<SimpleAssetResponse>(
-      static_cast<uint16_t>(200),
-      "doesn't matter",
-      CesiumAsync::HttpHeaders{},
-      std::move(tilesetContent));
-
-  auto pMockCompletedRequest = std::make_shared<SimpleAssetRequest>(
-      "GET",
-      "tileset.json",
-      CesiumAsync::HttpHeaders{},
-      std::move(pMockCompletedResponse));
-
-  std::map<std::string, std::shared_ptr<SimpleAssetRequest>>
-      mockCompletedRequests;
-  mockCompletedRequests.insert({tilesetPath, std::move(pMockCompletedRequest)});
-
-  std::shared_ptr<SimpleAssetAccessor> pMockAssetAccessor =
-      std::make_shared<SimpleAssetAccessor>(std::move(mockCompletedRequests));
-
-  auto pMockPrepareRendererResource =
-      std::make_shared<SimplePrepareRendererResource>();
-
-  auto pMockCreditSystem = std::make_shared<CreditSystem>();
-
-  AsyncSystem asyncSystem{std::make_shared<SimpleTaskProcessor>()};
-
-  return TilesetExternals{
-      std::move(pMockAssetAccessor),
-      std::move(pMockPrepareRendererResource),
-      std::move(asyncSystem),
-      std::move(pMockCreditSystem)};
-}
-
-TilesetContentLoaderResult<TilesetJsonLoader>
-createLoader(const std::filesystem::path& tilesetPath) {
-  std::string tilesetPathStr = tilesetPath.string();
-  auto externals = createMockTilesetExternals(tilesetPathStr);
-  auto loaderResultFuture =
-      TilesetJsonLoader::createLoader(externals, tilesetPathStr, {});
-  externals.asyncSystem.dispatchMainThreadTasks();
-
-  return loaderResultFuture.wait();
-}
 
 TileLoadResult loadTileContent(
     const std::filesystem::path& tilePath,
@@ -113,8 +97,8 @@ TEST_CASE("Test creating tileset json loader") {
   Cesium3DTilesContent::registerAllTileContentTypes();
 
   SECTION("Create valid tileset json with REPLACE refinement") {
-    auto loaderResult =
-        createLoader(testDataPath / "ReplaceTileset" / "tileset.json");
+    auto loaderResult = createTilesetJsonLoader(
+        testDataPath / "ReplaceTileset" / "tileset.json");
 
     CHECK(!loaderResult.errors.hasErrors());
 
@@ -181,7 +165,7 @@ TEST_CASE("Test creating tileset json loader") {
 
   SECTION("Create valid tileset json with ADD refinement") {
     auto loaderResult =
-        createLoader(testDataPath / "AddTileset" / "tileset2.json");
+        createTilesetJsonLoader(testDataPath / "AddTileset" / "tileset2.json");
 
     CHECK(!loaderResult.errors.hasErrors());
 
@@ -228,7 +212,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Tileset has tile with sphere bounding volume") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" /
         "SphereBoundingVolumeTileset.json");
 
@@ -246,7 +230,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Tileset has tile with box bounding volume") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" /
         "BoxBoundingVolumeTileset.json");
 
@@ -265,7 +249,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Tileset has tile with no bounding volume field") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" /
         "NoBoundingVolumeTileset.json");
 
@@ -280,7 +264,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Tileset has tile with no geometric error field") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" /
         "NoGeometricErrorTileset.json");
 
@@ -299,7 +283,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Tileset has tile with no capitalized Refinement field") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" /
         "NoCapitalizedRefineTileset.json");
 
@@ -320,7 +304,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Scale geometric error along with tile transform") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" /
         "ScaleGeometricErrorTileset.json");
 
@@ -339,7 +323,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Tileset with empty tile") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" / "EmptyTileTileset.json");
     CHECK(!loaderResult.errors.hasErrors());
     REQUIRE(loaderResult.pRootTile);
@@ -356,7 +340,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Tileset with quadtree implicit tile") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" /
         "QuadtreeImplicitTileset.json");
     CHECK(!loaderResult.errors.hasErrors());
@@ -379,7 +363,7 @@ TEST_CASE("Test creating tileset json loader") {
   }
 
   SECTION("Tileset with octree implicit tile") {
-    auto loaderResult = createLoader(
+    auto loaderResult = createTilesetJsonLoader(
         testDataPath / "MultipleKindsOfTilesets" /
         "OctreeImplicitTileset.json");
     CHECK(!loaderResult.errors.hasErrors());
@@ -403,7 +387,7 @@ TEST_CASE("Test creating tileset json loader") {
 
   SECTION("Tileset with metadata") {
     auto loaderResult =
-        createLoader(testDataPath / "WithMetadata" / "tileset.json");
+        createTilesetJsonLoader(testDataPath / "WithMetadata" / "tileset.json");
 
     CHECK(!loaderResult.errors.hasErrors());
     REQUIRE(loaderResult.pLoader);
@@ -424,8 +408,8 @@ TEST_CASE("Test loading individual tile of tileset json") {
   Cesium3DTilesContent::registerAllTileContentTypes();
 
   SECTION("Load tile that has render content") {
-    auto loaderResult =
-        createLoader(testDataPath / "ReplaceTileset" / "tileset.json");
+    auto loaderResult = createTilesetJsonLoader(
+        testDataPath / "ReplaceTileset" / "tileset.json");
     REQUIRE(loaderResult.pRootTile);
     REQUIRE(loaderResult.pRootTile->getChildren().size() == 1);
 
@@ -449,7 +433,7 @@ TEST_CASE("Test loading individual tile of tileset json") {
 
   SECTION("Load tile that has external content") {
     auto loaderResult =
-        createLoader(testDataPath / "AddTileset" / "tileset.json");
+        createTilesetJsonLoader(testDataPath / "AddTileset" / "tileset.json");
 
     REQUIRE(loaderResult.pRootTile);
     REQUIRE(loaderResult.pRootTile->getChildren().size() == 1);
@@ -500,8 +484,8 @@ TEST_CASE("Test loading individual tile of tileset json") {
   }
 
   SECTION("Load tile that has external content with implicit tiling") {
-    auto loaderResult =
-        createLoader(testDataPath / "ImplicitTileset" / "tileset_1.1.json");
+    auto loaderResult = createTilesetJsonLoader(
+        testDataPath / "ImplicitTileset" / "tileset_1.1.json");
 
     REQUIRE(loaderResult.pRootTile);
     CHECK(loaderResult.pRootTile->isExternalContent());
@@ -599,8 +583,8 @@ TEST_CASE("Test loading individual tile of tileset json") {
   }
 
   SECTION("Check that tile with legacy implicit tiling extension still works") {
-    auto loaderResult =
-        createLoader(testDataPath / "ImplicitTileset" / "tileset_1.0.json");
+    auto loaderResult = createTilesetJsonLoader(
+        testDataPath / "ImplicitTileset" / "tileset_1.0.json");
 
     REQUIRE(loaderResult.pRootTile);
     CHECK(loaderResult.pRootTile->isExternalContent());
@@ -620,4 +604,53 @@ TEST_CASE("Test loading individual tile of tileset json") {
     CHECK(pLoader->getSubtreeLevels() == 2);
     CHECK(pLoader->getAvailableLevels() == 2);
   }
+}
+Cesium3DTilesSelection::TilesetContentLoaderResult<TilesetJsonLoader>
+Cesium3DTilesSelection::createTilesetJsonLoader(
+    const std::filesystem::path& tilesetPath) {
+  std::string tilesetPathStr = tilesetPath.string();
+  auto pAccessor = std::make_shared<SimpleAssetAccessor>(
+      std::map<std::string, std::shared_ptr<SimpleAssetRequest>>());
+  auto externals = createMockJsonTilesetExternals(tilesetPathStr, pAccessor);
+  auto loaderResultFuture =
+      TilesetJsonLoader::createLoader(externals, tilesetPathStr, {});
+  externals.asyncSystem.dispatchMainThreadTasks();
+
+  return loaderResultFuture.wait();
+}
+Cesium3DTilesSelection::TilesetExternals
+Cesium3DTilesSelection::createMockJsonTilesetExternals(
+    const std::string& tilesetPath,
+    std::shared_ptr<CesiumNativeTests::SimpleAssetAccessor>& pAssetAccessor) {
+  auto tilesetContent = readFile(tilesetPath);
+  auto pMockCompletedResponse =
+      std::make_unique<CesiumNativeTests::SimpleAssetResponse>(
+          static_cast<uint16_t>(200),
+          "doesn't matter",
+          CesiumAsync::HttpHeaders{},
+          std::move(tilesetContent));
+
+  auto pMockCompletedRequest =
+      std::make_shared<CesiumNativeTests::SimpleAssetRequest>(
+          "GET",
+          "tileset.json",
+          CesiumAsync::HttpHeaders{},
+          std::move(pMockCompletedResponse));
+
+  pAssetAccessor->mockCompletedRequests.insert(
+      {tilesetPath, std::move(pMockCompletedRequest)});
+
+  auto pMockPrepareRendererResource =
+      std::make_shared<SimplePrepareRendererResource>();
+
+  auto pMockCreditSystem = std::make_shared<CesiumUtility::CreditSystem>();
+
+  CesiumAsync::AsyncSystem asyncSystem{
+      std::make_shared<CesiumNativeTests::SimpleTaskProcessor>()};
+
+  return TilesetExternals{
+      std::move(pAssetAccessor),
+      std::move(pMockPrepareRendererResource),
+      std::move(asyncSystem),
+      std::move(pMockCreditSystem)};
 }

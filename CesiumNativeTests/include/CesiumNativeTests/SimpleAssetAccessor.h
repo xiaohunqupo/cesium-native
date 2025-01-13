@@ -1,12 +1,13 @@
 #pragma once
 
-#include "SimpleAssetRequest.h"
-#include "SimpleAssetResponse.h"
-
+#include <CesiumAsync/AsyncSystem.h>
 #include <CesiumAsync/IAssetAccessor.h>
 #include <CesiumAsync/IAssetRequest.h>
+#include <CesiumNativeTests/SimpleAssetRequest.h>
+#include <CesiumNativeTests/SimpleAssetResponse.h>
 
 #include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
 #include <map>
@@ -42,7 +43,7 @@ public:
       const std::string& /* verb */,
       const std::string& url,
       const std::vector<THeader>& headers,
-      const gsl::span<const std::byte>&) override {
+      const std::span<const std::byte>&) override {
     return this->get(asyncSystem, url, headers);
   }
 

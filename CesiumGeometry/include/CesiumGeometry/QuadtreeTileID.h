@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Library.h"
+#include <CesiumGeometry/Library.h>
 
 #include <cstdint>
 #include <functional>
@@ -111,10 +111,6 @@ template <> struct hash<CesiumGeometry::QuadtreeTileID> {
    * @brief A specialization of the `std::hash` template for
    * {@link CesiumGeometry::QuadtreeTileID} objects.
    */
-  size_t operator()(const CesiumGeometry::QuadtreeTileID& key) const noexcept {
-    // TODO: is this hash function any good? Probably not.
-    std::hash<uint32_t> h;
-    return h(key.level) ^ (h(key.x) << 1) ^ (h(key.y) << 2);
-  }
+  size_t operator()(const CesiumGeometry::QuadtreeTileID& key) const noexcept;
 };
 } // namespace std

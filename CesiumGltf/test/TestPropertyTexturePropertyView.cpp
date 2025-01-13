@@ -1,7 +1,39 @@
-#include "CesiumGltf/PropertyTexturePropertyView.h"
+#include <CesiumGltf/ClassProperty.h>
+#include <CesiumGltf/ExtensionKhrTextureTransform.h>
+#include <CesiumGltf/ImageAsset.h>
+#include <CesiumGltf/PropertyArrayView.h>
+#include <CesiumGltf/PropertyTextureProperty.h>
+#include <CesiumGltf/PropertyTransformations.h>
+#include <CesiumGltf/PropertyType.h>
+#include <CesiumGltf/PropertyTypeTraits.h>
+#include <CesiumGltf/Sampler.h>
+#include <CesiumGltf/TextureView.h>
+#include <CesiumUtility/JsonValue.h>
 
-#include <catch2/catch.hpp>
-#include <gsl/span>
+#include <glm/ext/vector_double2.hpp>
+#include <glm/ext/vector_double3.hpp>
+#include <glm/ext/vector_double4.hpp>
+#include <glm/ext/vector_int2_sized.hpp>
+#include <glm/ext/vector_int3_sized.hpp>
+#include <glm/ext/vector_int4_sized.hpp>
+#include <glm/ext/vector_uint2_sized.hpp>
+#include <glm/ext/vector_uint3_sized.hpp>
+#include <glm/ext/vector_uint4_sized.hpp>
+
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <optional>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
+#include <CesiumGltf/KhrTextureTransform.h>
+#include <CesiumGltf/PropertyTexturePropertyView.h>
+#include <CesiumUtility/Math.h>
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <climits>
 #include <cstddef>
@@ -25,7 +57,7 @@ void checkTextureValues(
       convertPropertyComponentTypeToString(componentType);
 
   Sampler sampler;
-  ImageCesium image;
+  ImageAsset image;
   image.width = 2;
   image.height = 2;
   image.channels = static_cast<int32_t>(sizeof(T));
@@ -97,7 +129,7 @@ void checkTextureValues(
   classProperty.defaultProperty = defaultValue;
 
   Sampler sampler;
-  ImageCesium image;
+  ImageAsset image;
   image.width = 2;
   image.height = 2;
   image.channels = static_cast<int32_t>(sizeof(T));
@@ -171,7 +203,7 @@ void checkNormalizedTextureValues(
   classProperty.defaultProperty = defaultValue;
 
   Sampler sampler;
-  ImageCesium image;
+  ImageAsset image;
   image.width = 2;
   image.height = 2;
   image.channels = static_cast<int32_t>(sizeof(T));
@@ -241,7 +273,7 @@ void checkTextureArrayValues(
   classProperty.count = count;
 
   Sampler sampler;
-  ImageCesium image;
+  ImageAsset image;
   image.width = 2;
   image.height = 2;
   image.channels =
@@ -327,7 +359,7 @@ void checkTextureArrayValues(
   classProperty.defaultProperty = defaultValue;
 
   Sampler sampler;
-  ImageCesium image;
+  ImageAsset image;
   image.width = 2;
   image.height = 2;
   image.channels =
@@ -427,7 +459,7 @@ void checkNormalizedTextureArrayValues(
   classProperty.defaultProperty = defaultValue;
 
   Sampler sampler;
-  ImageCesium image;
+  ImageAsset image;
   image.width = 2;
   image.height = 2;
   image.channels =
@@ -1395,7 +1427,7 @@ TEST_CASE("Check that PropertyTextureProperty values override class property "
   classProperty.max = 10.0f;
 
   Sampler sampler;
-  ImageCesium image;
+  ImageAsset image;
   image.width = 2;
   image.height = 2;
   image.channels = 4;
@@ -1472,7 +1504,7 @@ TEST_CASE("Check that non-adjacent channels resolve to expected output") {
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
 
     Sampler sampler;
-    ImageCesium image;
+    ImageAsset image;
     image.width = 2;
     image.height = 2;
     image.channels = 4;
@@ -1514,7 +1546,7 @@ TEST_CASE("Check that non-adjacent channels resolve to expected output") {
     classProperty.componentType = ClassProperty::ComponentType::UINT16;
 
     Sampler sampler;
-    ImageCesium image;
+    ImageAsset image;
     image.width = 2;
     image.height = 2;
     image.channels = 4;
@@ -1555,7 +1587,7 @@ TEST_CASE("Check that non-adjacent channels resolve to expected output") {
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
 
     Sampler sampler;
-    ImageCesium image;
+    ImageAsset image;
     image.width = 2;
     image.height = 2;
     image.channels = 4;
@@ -1601,7 +1633,7 @@ TEST_CASE("Check that non-adjacent channels resolve to expected output") {
     classProperty.array = true;
 
     Sampler sampler;
-    ImageCesium image;
+    ImageAsset image;
     image.width = 2;
     image.height = 2;
     image.channels = 4;
@@ -1658,7 +1690,7 @@ TEST_CASE("Check sampling with different sampler values") {
   classProperty.type = ClassProperty::Type::SCALAR;
   classProperty.componentType = ClassProperty::ComponentType::UINT8;
 
-  ImageCesium image;
+  ImageAsset image;
   image.width = 2;
   image.height = 2;
   image.channels = 1;
@@ -1768,3 +1800,287 @@ TEST_CASE("Check sampling with different sampler values") {
     }
   }
 }
+
+TEST_CASE("Test PropertyTextureProperty constructs with "
+          "applyKhrTextureTransformExtension = true") {
+  std::vector<uint8_t> data{1, 2, 3, 4};
+
+  PropertyTextureProperty property;
+  property.texCoord = 0;
+
+  ExtensionKhrTextureTransform& textureTransformExtension =
+      property.addExtension<ExtensionKhrTextureTransform>();
+  textureTransformExtension.offset = {0.5, -0.5};
+  textureTransformExtension.rotation = CesiumUtility::Math::PiOverTwo;
+  textureTransformExtension.scale = {0.5, 0.5};
+  textureTransformExtension.texCoord = 10;
+
+  ClassProperty classProperty;
+  classProperty.type = ClassProperty::Type::SCALAR;
+  classProperty.componentType = ClassProperty::ComponentType::UINT8;
+
+  Sampler sampler;
+  sampler.wrapS = Sampler::WrapS::REPEAT;
+  sampler.wrapT = Sampler::WrapT::REPEAT;
+
+  ImageAsset image;
+  image.width = 2;
+  image.height = 2;
+  image.channels = 1;
+  image.bytesPerChannel = 1;
+
+  std::vector<std::byte>& imageData = image.pixelData;
+  imageData.resize(data.size());
+  std::memcpy(imageData.data(), data.data(), data.size());
+
+  property.channels = {0};
+
+  TextureViewOptions options;
+  options.applyKhrTextureTransformExtension = true;
+
+  PropertyTexturePropertyView<uint8_t>
+      view(property, classProperty, sampler, image, options);
+  REQUIRE(view.status() == PropertyTexturePropertyViewStatus::Valid);
+
+  auto textureTransform = view.getTextureTransform();
+  REQUIRE(textureTransform != std::nullopt);
+  REQUIRE(textureTransform->offset() == glm::dvec2(0.5, -0.5));
+  REQUIRE(textureTransform->rotation() == CesiumUtility::Math::PiOverTwo);
+  REQUIRE(textureTransform->scale() == glm::dvec2(0.5, 0.5));
+
+  // Texcoord is overridden by value in KHR_texture_transform.
+  REQUIRE(
+      view.getTexCoordSetIndex() == textureTransform->getTexCoordSetIndex());
+  REQUIRE(textureTransform->getTexCoordSetIndex() == 10);
+
+  // This transforms to the following UV values:
+  // (0, 0) -> (0.5, -0.5) -> wraps to (0.5, 0.5)
+  // (1, 0) -> (0.5, -1) -> wraps to (0.5, 0)
+  // (0, 1) -> (1, -0.5) -> wraps to (0, 0.5)
+  // (1, 1) -> (1, -1) -> wraps to (0.0, 0.0)
+  std::vector<glm::dvec2> texCoords{
+      glm::dvec2(0, 0),
+      glm::dvec2(1.0, 0),
+      glm::dvec2(0, 1.0),
+      glm::dvec2(1.0, 1.0)};
+
+  std::vector<uint8_t> expectedValues{4, 2, 3, 1};
+
+  for (size_t i = 0; i < texCoords.size(); i++) {
+    glm::dvec2 uv = texCoords[i];
+    REQUIRE(view.getRaw(uv[0], uv[1]) == expectedValues[i]);
+    REQUIRE(view.get(uv[0], uv[1]) == expectedValues[i]);
+  }
+}
+
+TEST_CASE("Test normalized PropertyTextureProperty constructs with "
+          "applyKhrTextureTransformExtension = true") {
+  std::vector<uint8_t> data{0, 64, 127, 255};
+
+  PropertyTextureProperty property;
+  property.texCoord = 0;
+
+  ExtensionKhrTextureTransform& textureTransformExtension =
+      property.addExtension<ExtensionKhrTextureTransform>();
+  textureTransformExtension.offset = {0.5, -0.5};
+  textureTransformExtension.rotation = CesiumUtility::Math::PiOverTwo;
+  textureTransformExtension.scale = {0.5, 0.5};
+  textureTransformExtension.texCoord = 10;
+
+  ClassProperty classProperty;
+  classProperty.type = ClassProperty::Type::SCALAR;
+  classProperty.componentType = ClassProperty::ComponentType::UINT8;
+  classProperty.normalized = true;
+
+  Sampler sampler;
+  sampler.wrapS = Sampler::WrapS::REPEAT;
+  sampler.wrapT = Sampler::WrapT::REPEAT;
+
+  ImageAsset image;
+  image.width = 2;
+  image.height = 2;
+  image.channels = 1;
+  image.bytesPerChannel = 1;
+
+  std::vector<std::byte>& imageData = image.pixelData;
+  imageData.resize(data.size());
+  std::memcpy(imageData.data(), data.data(), data.size());
+
+  property.channels = {0};
+
+  TextureViewOptions options;
+  options.applyKhrTextureTransformExtension = true;
+
+  PropertyTexturePropertyView<uint8_t, true>
+      view(property, classProperty, sampler, image, options);
+  REQUIRE(view.status() == PropertyTexturePropertyViewStatus::Valid);
+
+  auto textureTransform = view.getTextureTransform();
+  REQUIRE(textureTransform != std::nullopt);
+  REQUIRE(textureTransform->offset() == glm::dvec2(0.5, -0.5));
+  REQUIRE(textureTransform->rotation() == CesiumUtility::Math::PiOverTwo);
+  REQUIRE(textureTransform->scale() == glm::dvec2(0.5, 0.5));
+
+  // Texcoord is overridden by value in KHR_texture_transform.
+  REQUIRE(
+      view.getTexCoordSetIndex() == textureTransform->getTexCoordSetIndex());
+  REQUIRE(textureTransform->getTexCoordSetIndex() == 10);
+
+  // This transforms to the following UV values:
+  // (0, 0) -> (0.5, -0.5) -> wraps to (0.5, 0.5)
+  // (1, 0) -> (0.5, -1) -> wraps to (0.5, 0)
+  // (0, 1) -> (1, -0.5) -> wraps to (0, 0.5)
+  // (1, 1) -> (1, -1) -> wraps to (0.0, 0.0)
+  std::vector<glm::dvec2> texCoords{
+      glm::dvec2(0, 0),
+      glm::dvec2(1.0, 0),
+      glm::dvec2(0, 1.0),
+      glm::dvec2(1.0, 1.0)};
+
+  std::vector<uint8_t> expectedValues{255, 64, 127, 0};
+
+  for (size_t i = 0; i < texCoords.size(); i++) {
+    glm::dvec2 uv = texCoords[i];
+    REQUIRE(view.getRaw(uv[0], uv[1]) == expectedValues[i]);
+    REQUIRE(
+        view.get(uv[0], uv[1]) ==
+        static_cast<double>(expectedValues[i]) / 255.0);
+  }
+}
+
+TEST_CASE("Test PropertyTextureProperty constructs with "
+          "makeImageCopy = true") {
+  std::vector<uint8_t> data{1, 2, 3, 4};
+
+  PropertyTextureProperty property;
+  property.texCoord = 0;
+
+  ExtensionKhrTextureTransform& textureTransformExtension =
+      property.addExtension<ExtensionKhrTextureTransform>();
+  textureTransformExtension.offset = {0.5, -0.5};
+  textureTransformExtension.rotation = CesiumUtility::Math::PiOverTwo;
+  textureTransformExtension.scale = {0.5, 0.5};
+  textureTransformExtension.texCoord = 10;
+
+  ClassProperty classProperty;
+  classProperty.type = ClassProperty::Type::SCALAR;
+  classProperty.componentType = ClassProperty::ComponentType::UINT8;
+
+  Sampler sampler;
+  sampler.wrapS = Sampler::WrapS::REPEAT;
+  sampler.wrapT = Sampler::WrapT::REPEAT;
+
+  ImageAsset image;
+  image.width = 2;
+  image.height = 2;
+  image.channels = 1;
+  image.bytesPerChannel = 1;
+
+  std::vector<std::byte>& imageData = image.pixelData;
+  imageData.resize(data.size());
+  std::memcpy(imageData.data(), data.data(), data.size());
+
+  property.channels = {0};
+
+  TextureViewOptions options;
+  options.makeImageCopy = true;
+
+  PropertyTexturePropertyView<uint8_t>
+      view(property, classProperty, sampler, image, options);
+  REQUIRE(view.status() == PropertyTexturePropertyViewStatus::Valid);
+
+  // Clear the original image data.
+  std::vector<std::byte> emptyData;
+  image.pixelData.swap(emptyData);
+
+  const ImageAsset* pImage = view.getImage();
+  REQUIRE(pImage);
+  REQUIRE(pImage->width == image.width);
+  REQUIRE(pImage->height == image.height);
+  REQUIRE(pImage->channels == image.channels);
+  REQUIRE(pImage->bytesPerChannel == image.bytesPerChannel);
+  REQUIRE(pImage->pixelData.size() == data.size());
+
+  std::vector<glm::dvec2> texCoords{
+      glm::dvec2(0, 0),
+      glm::dvec2(0.5, 0),
+      glm::dvec2(0, 0.5),
+      glm::dvec2(0.5, 0.5)};
+
+  for (size_t i = 0; i < texCoords.size(); i++) {
+    glm::dvec2 uv = texCoords[i];
+    REQUIRE(view.getRaw(uv[0], uv[1]) == data[i]);
+    REQUIRE(view.get(uv[0], uv[1]) == data[i]);
+  }
+}
+
+TEST_CASE("Test normalized PropertyTextureProperty constructs with "
+          "makeImageCopy = true") {
+  std::vector<uint8_t> data{0, 64, 127, 255};
+
+  PropertyTextureProperty property;
+  property.texCoord = 0;
+
+  ExtensionKhrTextureTransform& textureTransformExtension =
+      property.addExtension<ExtensionKhrTextureTransform>();
+  textureTransformExtension.offset = {0.5, -0.5};
+  textureTransformExtension.rotation = CesiumUtility::Math::PiOverTwo;
+  textureTransformExtension.scale = {0.5, 0.5};
+  textureTransformExtension.texCoord = 10;
+
+  ClassProperty classProperty;
+  classProperty.type = ClassProperty::Type::SCALAR;
+  classProperty.componentType = ClassProperty::ComponentType::UINT8;
+  classProperty.normalized = true;
+
+  Sampler sampler;
+  sampler.wrapS = Sampler::WrapS::REPEAT;
+  sampler.wrapT = Sampler::WrapT::REPEAT;
+
+  ImageAsset image;
+  image.width = 2;
+  image.height = 2;
+  image.channels = 1;
+  image.bytesPerChannel = 1;
+
+  std::vector<std::byte>& imageData = image.pixelData;
+  imageData.resize(data.size());
+  std::memcpy(imageData.data(), data.data(), data.size());
+
+  property.channels = {0};
+
+  TextureViewOptions options;
+  options.makeImageCopy = true;
+
+  PropertyTexturePropertyView<uint8_t, true>
+      view(property, classProperty, sampler, image, options);
+  REQUIRE(view.status() == PropertyTexturePropertyViewStatus::Valid);
+
+  // Clear the original image data.
+  std::vector<std::byte> emptyData;
+  image.pixelData.swap(emptyData);
+
+  const ImageAsset* pImage = view.getImage();
+  REQUIRE(pImage);
+  REQUIRE(pImage->width == image.width);
+  REQUIRE(pImage->height == image.height);
+  REQUIRE(pImage->channels == image.channels);
+  REQUIRE(pImage->bytesPerChannel == image.bytesPerChannel);
+  REQUIRE(pImage->pixelData.size() == data.size());
+
+  std::vector<glm::dvec2> texCoords{
+      glm::dvec2(0, 0),
+      glm::dvec2(0.5, 0),
+      glm::dvec2(0, 0.5),
+      glm::dvec2(0.5, 0.5)};
+
+  for (size_t i = 0; i < texCoords.size(); i++) {
+    glm::dvec2 uv = texCoords[i];
+    REQUIRE(view.getRaw(uv[0], uv[1]) == data[i]);
+    REQUIRE(view.get(uv[0], uv[1]) == static_cast<double>(data[i]) / 255.0);
+  }
+}
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif

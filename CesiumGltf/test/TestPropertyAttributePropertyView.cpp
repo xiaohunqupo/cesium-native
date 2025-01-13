@@ -1,7 +1,37 @@
-#include "CesiumGltf/PropertyAttributePropertyView.h"
+#include <CesiumGltf/Accessor.h>
+#include <CesiumGltf/AccessorView.h>
+#include <CesiumGltf/Buffer.h>
+#include <CesiumGltf/BufferView.h>
+#include <CesiumGltf/ClassProperty.h>
+#include <CesiumGltf/Model.h>
+#include <CesiumGltf/PropertyAttributeProperty.h>
+#include <CesiumGltf/PropertyTransformations.h>
+#include <CesiumGltf/PropertyType.h>
+#include <CesiumGltf/PropertyTypeTraits.h>
+#include <CesiumUtility/JsonValue.h>
 
-#include <catch2/catch.hpp>
-#include <gsl/span>
+#include <glm/ext/matrix_double2x2.hpp>
+#include <glm/ext/matrix_float2x2.hpp>
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/vector_double2.hpp>
+#include <glm/ext/vector_double3.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_int2_sized.hpp>
+#include <glm/ext/vector_uint3_sized.hpp>
+#include <glm/fwd.hpp>
+
+#include <cstdint>
+#include <cstring>
+#include <optional>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
+#include <CesiumGltf/PropertyAttributePropertyView.h>
+#include <CesiumUtility/Assert.h>
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
 #include <vector>
@@ -55,7 +85,7 @@ const Accessor& addValuesToModel(Model& model, const std::vector<T>& values) {
     accessor.type = Accessor::Type::MAT4;
     break;
   default:
-    assert(false && "Input type is not supported as an accessor type");
+    CESIUM_ASSERT(false && "Input type is not supported as an accessor type");
     break;
   }
 
@@ -73,14 +103,11 @@ const Accessor& addValuesToModel(Model& model, const std::vector<T>& values) {
   case PropertyComponentType::Uint16:
     accessor.componentType = Accessor::ComponentType::UNSIGNED_SHORT;
     break;
-  case PropertyComponentType::Uint32:
-    accessor.componentType = Accessor::ComponentType::UNSIGNED_INT;
-    break;
   case PropertyComponentType::Float32:
     accessor.componentType = Accessor::ComponentType::FLOAT;
     break;
   default:
-    assert(
+    CESIUM_ASSERT(
         false &&
         "Input component type is not supported as an accessor component type");
     break;
@@ -207,11 +234,6 @@ TEST_CASE("Check scalar PropertyAttributePropertyView") {
     checkAttributeValues(data);
   }
 
-  SECTION("uint32_t") {
-    std::vector<uint32_t> data{16777216, 65545, 131604, 16777480};
-    checkAttributeValues(data);
-  }
-
   SECTION("float") {
     std::vector<float> data{12.3333f, -12.44555f, -5.6111f, 6.7421f};
     checkAttributeValues(data);
@@ -284,16 +306,6 @@ TEST_CASE("Check scalar PropertyAttributePropertyView (normalized)") {
     checkNormalizedAttributeValues(data, expected);
   }
 
-  SECTION("Uint32") {
-    std::vector<uint32_t> data{16777216, 65545, 131604, 16777480};
-    std::vector<std::optional<double>> expected{
-        normalize(data[0]),
-        normalize(data[1]),
-        normalize(data[2]),
-        normalize(data[3])};
-    checkNormalizedAttributeValues(data, expected);
-  }
-
   SECTION("Uint8 with offset / scale") {
     std::vector<uint8_t> data{12, 33, 56, 67};
     const double offset = 1.0;
@@ -346,15 +358,6 @@ TEST_CASE("Check vecN PropertyAttributePropertyView") {
         glm::vec3(4.12f, -5.008f, 6.0f),
         glm::vec3(7.0f, 8.0f, 9.01f),
         glm::vec3(-0.28f, 5.0f, 1.2f)};
-    checkAttributeValues(data);
-  }
-
-  SECTION("glm::uvec4") {
-    std::vector<glm::uvec4> data{
-        glm::uvec4(0, 12, 324, 256),
-        glm::uvec4(9234, 12, 7, 1),
-        glm::uvec4(532, 2, 88, 16),
-        glm::uvec4(264, 256, 22, 101)};
     checkAttributeValues(data);
   }
 
@@ -445,20 +448,6 @@ TEST_CASE("Check vecN PropertyAttributePropertyView (normalized)") {
         glm::u8vec3(7, 8, 9),
         glm::u8vec3(0, 5, 2)};
     std::vector<std::optional<glm::dvec3>> expected{
-        normalize(data[0]),
-        normalize(data[1]),
-        normalize(data[2]),
-        normalize(data[3])};
-    checkNormalizedAttributeValues(data, expected);
-  }
-
-  SECTION("glm::uvec4") {
-    std::vector<glm::uvec4> data{
-        glm::uvec4(123, 20, 13, 0),
-        glm::uvec4(43, 5, 86, 11),
-        glm::uvec4(7345, 448, 3219, 83),
-        glm::uvec4(0, 775, 12, 27)};
-    std::vector<std::optional<glm::dvec4>> expected{
         normalize(data[0]),
         normalize(data[1]),
         normalize(data[2]),
@@ -861,3 +850,7 @@ TEST_CASE("Check that PropertyAttributeProperty values override class property "
     REQUIRE(view.get(i) == expected[static_cast<size_t>(i)]);
   }
 }
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif

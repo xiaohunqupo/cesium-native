@@ -1,18 +1,31 @@
-#include "CesiumAsync/AsyncSystem.h"
-#include "CesiumAsync/CachingAssetAccessor.h"
-#include "CesiumAsync/ICacheDatabase.h"
-#include "CesiumAsync/ITaskProcessor.h"
 #include "MockAssetAccessor.h"
 #include "MockAssetRequest.h"
 #include "MockAssetResponse.h"
 #include "MockTaskProcessor.h"
 #include "ResponseCacheControl.h"
 
-#include <catch2/catch.hpp>
+#include <CesiumAsync/AsyncSystem.h>
+#include <CesiumAsync/CacheItem.h>
+#include <CesiumAsync/CachingAssetAccessor.h>
+#include <CesiumAsync/HttpHeaders.h>
+#include <CesiumAsync/IAssetAccessor.h>
+#include <CesiumAsync/IAssetRequest.h>
+#include <CesiumAsync/IAssetResponse.h>
+#include <CesiumAsync/ICacheDatabase.h>
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <spdlog/spdlog.h>
 
 #include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <memory>
 #include <optional>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace CesiumAsync;
 
@@ -51,7 +64,7 @@ public:
       const HttpHeaders& requestHeaders,
       uint16_t statusCode,
       const HttpHeaders& responseHeaders,
-      const gsl::span<const std::byte>& responseData) override {
+      const std::span<const std::byte>& responseData) override {
     this->storeRequestParam = StoreRequestParameters{
         key,
         expiryTime,
@@ -691,15 +704,22 @@ TEST_CASE("Test serving cache item") {
     // test that the response is from the cache
     AsyncSystem asyncSystem(mockTaskProcessor);
     cacheAssetAccessor
-        ->get(asyncSystem, "test.com", std::vector<IAssetAccessor::THeader>{})
+        ->get(
+            asyncSystem,
+            "test.com",
+            std::vector<IAssetAccessor::THeader>{
+                {"Some-Request-Header", "The Value"}})
         .thenImmediately(
             [](const std::shared_ptr<IAssetRequest>& completedRequest) {
               REQUIRE(completedRequest != nullptr);
-              REQUIRE(completedRequest->url() == "cache.com");
+              REQUIRE(completedRequest->method() == "GET");
+
+              // URL and Headers should match the original request, even if
+              // that's different from what's in the cache.
+              REQUIRE(completedRequest->url() == "test.com");
               REQUIRE(
                   completedRequest->headers() ==
-                  HttpHeaders{{"Cache-Request-Header", "Cache-Request-Value"}});
-              REQUIRE(completedRequest->method() == "GET");
+                  HttpHeaders{{"Some-Request-Header", "The Value"}});
 
               const IAssetResponse* response = completedRequest->response();
               REQUIRE(response != nullptr);
@@ -782,15 +802,22 @@ TEST_CASE("Test serving cache item") {
     // and cache control coming from the validation response
     AsyncSystem asyncSystem(mockTaskProcessor);
     cacheAssetAccessor
-        ->get(asyncSystem, "test.com", std::vector<IAssetAccessor::THeader>{})
+        ->get(
+            asyncSystem,
+            "test.com",
+            std::vector<IAssetAccessor::THeader>{
+                {"Some-Request-Header", "The Value"}})
         .thenImmediately(
             [](const std::shared_ptr<IAssetRequest>& completedRequest) {
               REQUIRE(completedRequest != nullptr);
-              REQUIRE(completedRequest->url() == "cache.com");
+              REQUIRE(completedRequest->method() == "GET");
+
+              // URL and Headers should match the original request, even if
+              // that's different from what's in the cache.
+              REQUIRE(completedRequest->url() == "test.com");
               REQUIRE(
                   completedRequest->headers() ==
-                  HttpHeaders{{"Cache-Request-Header", "Cache-Request-Value"}});
-              REQUIRE(completedRequest->method() == "GET");
+                  HttpHeaders{{"Some-Request-Header", "The Value"}});
 
               // check response header is updated
               const IAssetResponse* response = completedRequest->response();

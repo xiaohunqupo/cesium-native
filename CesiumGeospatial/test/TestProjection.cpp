@@ -1,9 +1,13 @@
-#include "CesiumGeospatial/GlobeRectangle.h"
-#include "CesiumGeospatial/Projection.h"
-
+#include <CesiumGeometry/Rectangle.h>
+#include <CesiumGeospatial/Cartographic.h>
+#include <CesiumGeospatial/Ellipsoid.h>
+#include <CesiumGeospatial/GeographicProjection.h>
+#include <CesiumGeospatial/GlobeRectangle.h>
+#include <CesiumGeospatial/Projection.h>
 #include <CesiumUtility/Math.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <glm/ext/vector_double2.hpp>
 #include <glm/geometric.hpp>
 
 using namespace CesiumGeometry;
@@ -12,13 +16,16 @@ using namespace CesiumUtility;
 
 TEST_CASE("computeProjectedRectangleSize") {
   SECTION("Entire Globe") {
-    GeographicProjection projection;
+    GeographicProjection projection(Ellipsoid::WGS84);
     Rectangle rectangle = projectRectangleSimple(
         projection,
         GlobeRectangle::fromDegrees(-180, -90, 180, 90));
     double maxHeight = 0.0;
-    glm::dvec2 size =
-        computeProjectedRectangleSize(projection, rectangle, maxHeight);
+    glm::dvec2 size = computeProjectedRectangleSize(
+        projection,
+        rectangle,
+        maxHeight,
+        Ellipsoid::WGS84);
     CHECK(size.x - Ellipsoid::WGS84.getMaximumRadius() * 2.0 > 0.0);
     CHECK(Math::equalsEpsilon(
         size.y,
@@ -30,13 +37,16 @@ TEST_CASE("computeProjectedRectangleSize") {
   SECTION("Hemispheres") {
     // A hemisphere should have approximately the diameter of the
     // globe.
-    GeographicProjection projection;
+    GeographicProjection projection(Ellipsoid::WGS84);
     Rectangle rectangle = projectRectangleSimple(
         projection,
         GlobeRectangle::fromDegrees(-180, -90, 0, 90));
     double maxHeight = 0.0;
-    glm::dvec2 size =
-        computeProjectedRectangleSize(projection, rectangle, maxHeight);
+    glm::dvec2 size = computeProjectedRectangleSize(
+        projection,
+        rectangle,
+        maxHeight,
+        Ellipsoid::WGS84);
     CHECK(Math::equalsEpsilon(
         size.x,
         Ellipsoid::WGS84.getMaximumRadius() * 2.0,
@@ -51,7 +61,11 @@ TEST_CASE("computeProjectedRectangleSize") {
     rectangle = projectRectangleSimple(
         projection,
         GlobeRectangle::fromDegrees(0, -90, 180, 90));
-    size = computeProjectedRectangleSize(projection, rectangle, maxHeight);
+    size = computeProjectedRectangleSize(
+        projection,
+        rectangle,
+        maxHeight,
+        Ellipsoid::WGS84);
     CHECK(Math::equalsEpsilon(
         size.x,
         Ellipsoid::WGS84.getMaximumRadius() * 2.0,
@@ -67,13 +81,16 @@ TEST_CASE("computeProjectedRectangleSize") {
   SECTION("Rectangle crossing the equator") {
     // For a rectangle that crosses the equator, the widest part is at the
     // equator.
-    GeographicProjection projection;
+    GeographicProjection projection(Ellipsoid::WGS84);
     Rectangle rectangle = projectRectangleSimple(
         projection,
         GlobeRectangle::fromDegrees(-100, -70, -80, 40));
     double maxHeight = 0.0;
-    glm::dvec2 size =
-        computeProjectedRectangleSize(projection, rectangle, maxHeight);
+    glm::dvec2 size = computeProjectedRectangleSize(
+        projection,
+        rectangle,
+        maxHeight,
+        Ellipsoid::WGS84);
     CHECK(Math::equalsEpsilon(
         size.x,
         glm::distance(
@@ -86,13 +103,16 @@ TEST_CASE("computeProjectedRectangleSize") {
   }
 
   SECTION("Narrow band around the entire globe") {
-    GeographicProjection projection;
+    GeographicProjection projection(Ellipsoid::WGS84);
     Rectangle rectangle = projectRectangleSimple(
         projection,
         GlobeRectangle::fromDegrees(-180, 20, 180, 40));
     double maxHeight = 0.0;
-    glm::dvec2 size =
-        computeProjectedRectangleSize(projection, rectangle, maxHeight);
+    glm::dvec2 size = computeProjectedRectangleSize(
+        projection,
+        rectangle,
+        maxHeight,
+        Ellipsoid::WGS84);
     CHECK(size.x - Ellipsoid::WGS84.getMaximumRadius() * 2.0 > 0.0);
     CHECK(Math::equalsEpsilon(
         size.y,

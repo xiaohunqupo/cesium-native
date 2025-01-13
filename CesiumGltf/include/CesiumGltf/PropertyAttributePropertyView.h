@@ -1,12 +1,12 @@
 #pragma once
 
-#include "CesiumGltf/AccessorView.h"
-#include "CesiumGltf/PropertyAttributeProperty.h"
-#include "CesiumGltf/PropertyTransformations.h"
-#include "CesiumGltf/PropertyTypeTraits.h"
-#include "CesiumGltf/PropertyView.h"
+#include <CesiumGltf/AccessorView.h>
+#include <CesiumGltf/PropertyAttributeProperty.h>
+#include <CesiumGltf/PropertyTransformations.h>
+#include <CesiumGltf/PropertyTypeTraits.h>
+#include <CesiumGltf/PropertyView.h>
+#include <CesiumUtility/Assert.h>
 
-#include <cassert>
 #include <cmath>
 #include <cstdint>
 
@@ -131,7 +131,7 @@ public:
    */
   PropertyAttributePropertyView(PropertyViewStatusType status) noexcept
       : PropertyView<ElementType, false>(status), _accessor{}, _size{0} {
-    assert(
+    CESIUM_ASSERT(
         this->_status != PropertyAttributePropertyViewStatus::Valid &&
         "An empty property view should not be constructed with a valid status");
   }
@@ -139,8 +139,8 @@ public:
   /**
    * @brief Constructs an instance of an empty property that specifies a default
    * value. Although this property has no data, it can return the default value
-   * when {@link PropertyAttributePropertyView::get} is called. However,
-   * {@link PropertyAttributePropertyView::getRaw} cannot be used.
+   * when {@link PropertyAttributePropertyView<ElementType, false>::get} is called. However,
+   * {@link PropertyAttributePropertyView<ElementType, false>::getRaw} cannot be used.
    *
    * @param classProperty The {@link ClassProperty} this property conforms to.
    * @param size The number of elements in the primitive's POSITION accessor.
@@ -230,14 +230,14 @@ public:
    * @return The value of the property for the given vertex.
    */
   ElementType getRaw(int64_t index) const noexcept {
-    assert(
+    CESIUM_ASSERT(
         this->_status == PropertyAttributePropertyViewStatus::Valid &&
         "Check the status() first to make sure view is valid");
-    assert(
+    CESIUM_ASSERT(
         size() > 0 &&
         "Check the size() of the view to make sure it's not empty");
-    assert(index >= 0 && "index must be non-negative");
-    assert(index < size() && "index must be less than size");
+    CESIUM_ASSERT(index >= 0 && "index must be non-negative");
+    CESIUM_ASSERT(index < size() && "index must be less than size");
 
     return _accessor[index];
   }
@@ -287,7 +287,7 @@ public:
    */
   PropertyAttributePropertyView(PropertyViewStatusType status) noexcept
       : PropertyView<ElementType, true>(status), _accessor{}, _size{0} {
-    assert(
+    CESIUM_ASSERT(
         this->_status != PropertyAttributePropertyViewStatus::Valid &&
         "An empty property view should not be constructed with a valid status");
   }
@@ -295,8 +295,7 @@ public:
   /**
    * @brief Constructs an instance of an empty property that specifies a default
    * value. Although this property has no data, it can return the default value
-   * when {@link PropertyAttributePropertyView::get} is called. However,
-   * {@link PropertyAttributePropertyView::getRaw} cannot be used.
+   * when \ref get is called. However, \ref getRaw cannot be used.
    *
    * @param classProperty The {@link ClassProperty} this property conforms to.
    * @param size The number of elements in the primitive's POSITION accessor.
@@ -411,14 +410,14 @@ public:
    * @return The value of the property for the given vertex.
    */
   ElementType getRaw(int64_t index) const noexcept {
-    assert(
+    CESIUM_ASSERT(
         this->_status == PropertyAttributePropertyViewStatus::Valid &&
         "Check the status() first to make sure view is valid");
-    assert(
+    CESIUM_ASSERT(
         size() > 0 &&
         "Check the size() of the view to make sure it's not empty");
-    assert(index >= 0 && "index must be non-negative");
-    assert(index < size() && "index must be less than size");
+    CESIUM_ASSERT(index >= 0 && "index must be non-negative");
+    CESIUM_ASSERT(index < size() && "index must be less than size");
 
     return _accessor[index];
   }

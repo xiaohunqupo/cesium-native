@@ -1,30 +1,19 @@
 #include <Cesium3DTiles/Extension3dTilesBoundingVolumeS2.h>
 #include <Cesium3DTilesReader/TilesetReader.h>
 #include <CesiumJsonReader/JsonReader.h>
+#include <CesiumJsonReader/JsonReaderOptions.h>
+#include <CesiumNativeTests/readFile.h>
 
-#include <catch2/catch.hpp>
-#include <glm/vec3.hpp>
-#include <gsl/span>
-#include <rapidjson/reader.h>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
+#include <catch2/matchers/catch_matchers_vector.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
-#include <fstream>
+#include <span>
 #include <string>
-
-namespace {
-std::vector<std::byte> readFile(const std::filesystem::path& fileName) {
-  std::ifstream file(fileName, std::ios::binary | std::ios::ate);
-  REQUIRE(file);
-
-  std::streamsize size = file.tellg();
-  file.seekg(0, std::ios::beg);
-
-  std::vector<std::byte> buffer(static_cast<size_t>(size));
-  file.read(reinterpret_cast<char*>(buffer.data()), size);
-
-  return buffer;
-}
-} // namespace
+#include <vector>
 
 TEST_CASE("Reads tileset JSON") {
   using namespace std::string_literals;
@@ -146,7 +135,7 @@ TEST_CASE("Reads extras") {
 
   Cesium3DTilesReader::TilesetReader reader;
   auto result = reader.readFromJson(
-      gsl::span(reinterpret_cast<const std::byte*>(s.c_str()), s.size()));
+      std::span(reinterpret_cast<const std::byte*>(s.c_str()), s.size()));
   REQUIRE(result.errors.empty());
   REQUIRE(result.warnings.empty());
   REQUIRE(result.value.has_value());
@@ -224,7 +213,7 @@ TEST_CASE("Reads 3DTILES_content_gltf") {
 
   Cesium3DTilesReader::TilesetReader reader;
   auto result = reader.readFromJson(
-      gsl::span(reinterpret_cast<const std::byte*>(s.c_str()), s.size()));
+      std::span(reinterpret_cast<const std::byte*>(s.c_str()), s.size()));
   REQUIRE(result.errors.empty());
   REQUIRE(result.warnings.empty());
   REQUIRE(result.value.has_value());
@@ -274,7 +263,7 @@ TEST_CASE("Reads custom extension") {
 
   Cesium3DTilesReader::TilesetReader reader;
   auto withCustomExt = reader.readFromJson(
-      gsl::span(reinterpret_cast<const std::byte*>(s.c_str()), s.size()));
+      std::span(reinterpret_cast<const std::byte*>(s.c_str()), s.size()));
   REQUIRE(withCustomExt.errors.empty());
   REQUIRE(withCustomExt.value.has_value());
 
@@ -301,7 +290,7 @@ TEST_CASE("Reads custom extension") {
       CesiumJsonReader::ExtensionState::Disabled);
 
   auto withoutCustomExt = reader.readFromJson(
-      gsl::span(reinterpret_cast<const std::byte*>(s.c_str()), s.size()));
+      std::span(reinterpret_cast<const std::byte*>(s.c_str()), s.size()));
 
   auto& zeroExtensions = withoutCustomExt.value->extensions;
   REQUIRE(zeroExtensions.empty());

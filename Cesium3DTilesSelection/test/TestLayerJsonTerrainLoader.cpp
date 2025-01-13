@@ -3,18 +3,40 @@
 #include "SimplePrepareRendererResource.h"
 
 #include <Cesium3DTilesContent/registerAllTileContentTypes.h>
+#include <Cesium3DTilesSelection/Tile.h>
+#include <Cesium3DTilesSelection/TileLoadResult.h>
+#include <Cesium3DTilesSelection/TileRefine.h>
+#include <Cesium3DTilesSelection/TilesetContentLoader.h>
+#include <Cesium3DTilesSelection/TilesetExternals.h>
+#include <Cesium3DTilesSelection/TilesetOptions.h>
+#include <CesiumAsync/AsyncSystem.h>
+#include <CesiumAsync/Future.h>
+#include <CesiumAsync/IAssetAccessor.h>
 #include <CesiumGeometry/QuadtreeTileID.h>
 #include <CesiumGeospatial/BoundingRegion.h>
+#include <CesiumGeospatial/Ellipsoid.h>
+#include <CesiumGeospatial/GeographicProjection.h>
+#include <CesiumGltf/Model.h>
 #include <CesiumNativeTests/SimpleAssetAccessor.h>
 #include <CesiumNativeTests/SimpleAssetRequest.h>
 #include <CesiumNativeTests/SimpleAssetResponse.h>
 #include <CesiumNativeTests/SimpleTaskProcessor.h>
 #include <CesiumNativeTests/readFile.h>
+#include <CesiumUtility/CreditSystem.h>
 #include <CesiumUtility/Math.h>
 
 #include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <spdlog/spdlog.h>
 
+#include <cstdint>
 #include <filesystem>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 using namespace Cesium3DTilesSelection;
 using namespace CesiumGeospatial;
@@ -52,7 +74,8 @@ Future<TileLoadResult> loadTile(
   tile.setBoundingVolume(BoundingRegionWithLooseFittingHeights{
       {GlobeRectangle(-Math::OnePi, -Math::PiOverTwo, 0.0, Math::PiOverTwo),
        -1000.0,
-       9000.0}});
+       9000.0,
+       Ellipsoid::WGS84}});
 
   TileLoadInput loadInput{
       tile,
@@ -401,7 +424,7 @@ TEST_CASE("Test load layer json tile content") {
 
   CesiumAsync::AsyncSystem asyncSystem{std::make_shared<SimpleTaskProcessor>()};
 
-  GeographicProjection projection;
+  GeographicProjection projection(Ellipsoid::WGS84);
   auto quadtreeRectangleProjected =
       projection.project(GeographicProjection::MAXIMUM_GLOBE_RECTANGLE);
 
@@ -691,7 +714,7 @@ TEST_CASE("Test creating tile children for layer json") {
 
   CesiumAsync::AsyncSystem asyncSystem{std::make_shared<SimpleTaskProcessor>()};
 
-  GeographicProjection projection;
+  GeographicProjection projection(Ellipsoid::WGS84);
   auto quadtreeRectangleProjected =
       projection.project(GeographicProjection::MAXIMUM_GLOBE_RECTANGLE);
 
@@ -741,7 +764,8 @@ TEST_CASE("Test creating tile children for layer json") {
     tile.setBoundingVolume(BoundingRegion(
         GlobeRectangle(-Math::OnePi, -Math::PiOverTwo, 0.0, Math::PiOverTwo),
         -1000.0,
-        9000.0));
+        9000.0,
+        Ellipsoid::WGS84));
 
     {
       MockTilesetContentManagerTestFixture::setTileLoadState(
@@ -837,7 +861,8 @@ TEST_CASE("Test creating tile children for layer json") {
     tile.setBoundingVolume(BoundingRegion(
         GlobeRectangle(-Math::OnePi, 0, -Math::PiOverTwo, Math::PiOverTwo),
         -1000.0,
-        9000.0));
+        9000.0,
+        Ellipsoid::WGS84));
     auto tileChildrenResult = loader.createTileChildren(tile);
     CHECK(tileChildrenResult.state == TileLoadResultState::Success);
 
@@ -911,7 +936,8 @@ TEST_CASE("Test creating tile children for layer json") {
     tile.setBoundingVolume(BoundingRegion(
         GlobeRectangle(-Math::PiOverTwo, -Math::PiOverTwo, 0, 0),
         -1000.0,
-        9000.0));
+        9000.0,
+        Ellipsoid::WGS84));
     auto tileChildrenResult = loader.createTileChildren(tile);
     CHECK(tileChildrenResult.state == TileLoadResultState::Success);
 

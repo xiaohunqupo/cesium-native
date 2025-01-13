@@ -1,8 +1,11 @@
-#include "CesiumGltf/ClassProperty.h"
-#include "CesiumGltf/PropertyTableProperty.h"
-#include "CesiumGltf/PropertyType.h"
+#include <CesiumGltf/AccessorSpec.h>
+#include <CesiumGltf/ClassProperty.h>
+#include <CesiumGltf/PropertyTableProperty.h>
+#include <CesiumGltf/PropertyType.h>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+
+#include <cstdint>
 
 using namespace CesiumGltf;
 
@@ -234,6 +237,34 @@ TEST_CASE("Test convertStringOffsetTypeStringToPropertyComponentType") {
       PropertyComponentType::None);
 }
 
+TEST_CASE("Test convertAccessorComponentTypeToPropertyComponentType") {
+  REQUIRE(
+      convertAccessorComponentTypeToPropertyComponentType(
+          AccessorSpec::ComponentType::BYTE) == PropertyComponentType::Int8);
+  REQUIRE(
+      convertAccessorComponentTypeToPropertyComponentType(
+          AccessorSpec::ComponentType::UNSIGNED_BYTE) ==
+      PropertyComponentType::Uint8);
+  REQUIRE(
+      convertAccessorComponentTypeToPropertyComponentType(
+          AccessorSpec::ComponentType::SHORT) == PropertyComponentType::Int16);
+  REQUIRE(
+      convertAccessorComponentTypeToPropertyComponentType(
+          AccessorSpec::ComponentType::UNSIGNED_SHORT) ==
+      PropertyComponentType::Uint16);
+  REQUIRE(
+      convertAccessorComponentTypeToPropertyComponentType(
+          AccessorSpec::ComponentType::UNSIGNED_INT) ==
+      PropertyComponentType::Uint32);
+  REQUIRE(
+      convertAccessorComponentTypeToPropertyComponentType(
+          AccessorSpec::ComponentType::FLOAT) ==
+      PropertyComponentType::Float32);
+  REQUIRE(
+      convertAccessorComponentTypeToPropertyComponentType(-1) ==
+      PropertyComponentType::None);
+}
+
 TEST_CASE("Test isPropertyTypeVecN") {
   REQUIRE(isPropertyTypeVecN(PropertyType::Vec2));
   REQUIRE(isPropertyTypeVecN(PropertyType::Vec3));
@@ -293,6 +324,23 @@ TEST_CASE("Test getDimensionsFromPropertyType") {
   REQUIRE(getDimensionsFromPropertyType(PropertyType::String) == 0);
   REQUIRE(getDimensionsFromPropertyType(PropertyType::Enum) == 0);
   REQUIRE(getDimensionsFromPropertyType(PropertyType::Invalid) == 0);
+}
+
+TEST_CASE("Test getComponentCountFromPropertyType") {
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Scalar) == 1);
+
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Vec2) == 2);
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Vec3) == 3);
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Vec4) == 4);
+
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Mat2) == 4);
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Mat3) == 9);
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Mat4) == 16);
+
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Boolean) == 0);
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::String) == 0);
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Enum) == 0);
+  REQUIRE(getComponentCountFromPropertyType(PropertyType::Invalid) == 0);
 }
 
 TEST_CASE("Test getSizeOfComponentType") {

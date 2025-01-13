@@ -1,9 +1,10 @@
 #pragma once
 
-#include "Library.h"
-
+#include <Cesium3DTilesSelection/Library.h>
+#include <CesiumGeospatial/Ellipsoid.h>
 #include <CesiumGltf/Ktx2TranscodeTargets.h>
 
+#include <any>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -45,6 +46,14 @@ struct CESIUM3DTILESSELECTION_API TilesetContentOptions {
    * the ideal target gpu-compressed pixel format to transcode to.
    */
   CesiumGltf::Ktx2TranscodeTargets ktx2TranscodeTargets;
+
+  /**
+   * @brief Whether or not to transform texture coordinates during load when
+   * textures have the `KHR_texture_transform` extension. Set this to false if
+   * texture coordinates will be transformed another way, such as in a vertex
+   * shader.
+   */
+  bool applyTextureTransform = true;
 };
 
 /**
@@ -195,7 +204,7 @@ struct CESIUM3DTILESSELECTION_API TilesetOptions {
    * unloaded until the total is under this number or until only required tiles
    * remain, whichever comes first.
    */
-  int64_t maximumCachedBytes = 512 * 1024 * 1024;
+  int64_t maximumCachedBytes = 512LL * 1024 * 1024;
 
   /**
    * @brief A table that maps the camera height above the ellipsoid to a fog
@@ -250,7 +259,7 @@ struct CESIUM3DTILESSELECTION_API TilesetOptions {
    * @brief Whether to keep tiles loaded during a transition period when
    * switching to a different LOD tile.
    *
-   * For each tile, TileContentLoadResult::lodTransitionFadePercentage will
+   * For each tile, {@link TileRenderContent::getLodTransitionFadePercentage} will
    * indicate to the client how faded to render the tile throughout the
    * transition. Tile fades can be used to mask LOD transitions and make them
    * appear less abrupt and jarring.
@@ -304,12 +313,21 @@ struct CESIUM3DTILESSELECTION_API TilesetOptions {
   TilesetContentOptions contentOptions;
 
   /**
-   * @brief Arbitrary data that will be passed to {@link prepareInLoadThread}.
+   * @brief Arbitrary data that will be passed to {@link IPrepareRendererResources::prepareInLoadThread}.
    *
    * This object is copied and given to tile preparation threads,
    * so it must be inexpensive to copy.
    */
   std::any rendererOptions;
+
+  /**
+   * @brief The ellipsoid to use for this tileset.
+   * This value shouldn't be changed after the tileset is constructed. If you
+   * need to change a tileset's ellipsoid, please recreate the tileset.
+   *
+   * If no ellipsoid is set, Ellipsoid::WGS84 will be used by default.
+   */
+  CesiumGeospatial::Ellipsoid ellipsoid = CesiumGeospatial::Ellipsoid::WGS84;
 };
 
 } // namespace Cesium3DTilesSelection

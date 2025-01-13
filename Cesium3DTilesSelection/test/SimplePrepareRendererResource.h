@@ -1,10 +1,11 @@
 #pragma once
 
-#include "Cesium3DTilesSelection/IPrepareRendererResources.h"
-#include "Cesium3DTilesSelection/RasterOverlayTile.h"
-#include "Cesium3DTilesSelection/Tile.h"
+#include <Cesium3DTilesSelection/IPrepareRendererResources.h>
+#include <Cesium3DTilesSelection/Tile.h>
+#include <CesiumRasterOverlays/RasterOverlayTile.h>
 
 #include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 
@@ -68,13 +69,13 @@ public:
   }
 
   virtual void* prepareRasterInLoadThread(
-      CesiumGltf::ImageCesium& /*image*/,
+      CesiumGltf::ImageAsset& /*image*/,
       const std::any& /*rendererOptions*/) override {
     return new AllocationResult{totalAllocation};
   }
 
   virtual void* prepareRasterInMainThread(
-      Cesium3DTilesSelection::RasterOverlayTile& /*rasterTile*/,
+      CesiumRasterOverlays::RasterOverlayTile& /*rasterTile*/,
       void* pLoadThreadResult) override {
     if (pLoadThreadResult) {
       AllocationResult* loadThreadResult =
@@ -86,7 +87,7 @@ public:
   }
 
   virtual void freeRaster(
-      const Cesium3DTilesSelection::RasterOverlayTile& /*rasterTile*/,
+      const CesiumRasterOverlays::RasterOverlayTile& /*rasterTile*/,
       void* pLoadThreadResult,
       void* pMainThreadResult) noexcept override {
     if (pMainThreadResult) {
@@ -105,7 +106,7 @@ public:
   virtual void attachRasterInMainThread(
       const Cesium3DTilesSelection::Tile& /*tile*/,
       int32_t /*overlayTextureCoordinateID*/,
-      const Cesium3DTilesSelection::RasterOverlayTile& /*rasterTile*/,
+      const CesiumRasterOverlays::RasterOverlayTile& /*rasterTile*/,
       void* /*pMainThreadRendererResources*/,
       const glm::dvec2& /*translation*/,
       const glm::dvec2& /*scale*/) override {}
@@ -113,7 +114,7 @@ public:
   virtual void detachRasterInMainThread(
       const Cesium3DTilesSelection::Tile& /*tile*/,
       int32_t /*overlayTextureCoordinateID*/,
-      const Cesium3DTilesSelection::RasterOverlayTile& /*rasterTile*/,
+      const CesiumRasterOverlays::RasterOverlayTile& /*rasterTile*/,
       void* /*pMainThreadRendererResources*/) noexcept override {}
 };
 } // namespace Cesium3DTilesSelection
