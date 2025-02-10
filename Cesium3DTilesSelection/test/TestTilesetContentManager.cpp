@@ -1,34 +1,82 @@
 #include "SimplePrepareRendererResource.h"
+#include "TestTilesetJsonLoader.h"
 #include "TilesetContentManager.h"
+#include "TilesetJsonLoader.h"
 
-#include <Cesium3DTilesContent/GltfUtilities.h>
 #include <Cesium3DTilesContent/registerAllTileContentTypes.h>
-#include <Cesium3DTilesSelection/DebugColorizeTilesRasterOverlay.h>
+#include <Cesium3DTilesSelection/RasterOverlayCollection.h>
 #include <Cesium3DTilesSelection/Tile.h>
+#include <Cesium3DTilesSelection/TileLoadResult.h>
+#include <Cesium3DTilesSelection/TileRefine.h>
 #include <Cesium3DTilesSelection/TilesetContentLoader.h>
+#include <Cesium3DTilesSelection/TilesetExternals.h>
+#include <Cesium3DTilesSelection/TilesetOptions.h>
+#include <CesiumAsync/Future.h>
+#include <CesiumAsync/IAssetAccessor.h>
+#include <CesiumGeometry/Axis.h>
 #include <CesiumGeometry/QuadtreeTileID.h>
+#include <CesiumGeometry/Rectangle.h>
 #include <CesiumGeospatial/Cartographic.h>
+#include <CesiumGeospatial/Ellipsoid.h>
+#include <CesiumGeospatial/GeographicProjection.h>
+#include <CesiumGeospatial/GlobeRectangle.h>
+#include <CesiumGeospatial/Projection.h>
+#include <CesiumGltf/Accessor.h>
 #include <CesiumGltf/AccessorView.h>
+#include <CesiumGltf/AccessorWriter.h>
+#include <CesiumGltf/Buffer.h>
+#include <CesiumGltf/BufferView.h>
+#include <CesiumGltf/ImageAsset.h>
+#include <CesiumGltf/Mesh.h>
+#include <CesiumGltf/MeshPrimitive.h>
+#include <CesiumGltf/Model.h>
+#include <CesiumGltf/Node.h>
+#include <CesiumGltf/Scene.h>
 #include <CesiumGltfReader/GltfReader.h>
 #include <CesiumNativeTests/SimpleAssetAccessor.h>
 #include <CesiumNativeTests/SimpleAssetRequest.h>
 #include <CesiumNativeTests/SimpleAssetResponse.h>
 #include <CesiumNativeTests/SimpleTaskProcessor.h>
 #include <CesiumNativeTests/readFile.h>
+#include <CesiumRasterOverlays/DebugColorizeTilesRasterOverlay.h>
+#include <CesiumRasterOverlays/IPrepareRasterOverlayRendererResources.h>
+#include <CesiumRasterOverlays/RasterOverlay.h>
+#include <CesiumRasterOverlays/RasterOverlayDetails.h>
+#include <CesiumRasterOverlays/RasterOverlayTile.h>
+#include <CesiumRasterOverlays/RasterOverlayTileProvider.h>
+#include <CesiumUtility/CreditSystem.h>
 #include <CesiumUtility/IntrusivePointer.h>
 #include <CesiumUtility/Math.h>
 
-#include <catch2/catch.hpp>
-#include <glm/glm.hpp>
+#include <doctest/doctest.h>
+#include <glm/common.hpp>
+#include <glm/ext/vector_double3.hpp>
+#include <glm/ext/vector_float2.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/trigonometric.hpp>
+#include <spdlog/logger.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <span>
+#include <type_traits>
+#include <utility>
+#include <variant>
 #include <vector>
 
+using namespace doctest;
 using namespace Cesium3DTilesSelection;
 using namespace CesiumGeospatial;
 using namespace CesiumGeometry;
 using namespace CesiumUtility;
 using namespace CesiumNativeTests;
+using namespace CesiumRasterOverlays;
 
 namespace {
 std::filesystem::path testDataPath = Cesium3DTilesSelection_TEST_DATA_DIR;
@@ -41,8 +89,9 @@ public:
         std::move(mockLoadTileContent));
   }
 
-  TileChildrenResult
-  createTileChildren([[maybe_unused]] const Tile& tile) override {
+  TileChildrenResult createTileChildren(
+      [[maybe_unused]] const Tile& tile,
+      [[maybe_unused]] const Ellipsoid& ellipsoid) override {
     return std::move(mockCreateTileChildren);
   }
 
@@ -78,8 +127,8 @@ CesiumGltf::Model createGlobeGrid(
   glm::dvec3 max = min;
 
   std::vector<glm::dvec3> positions;
-  indices.reserve(6 * (width - 1) * (height - 1));
-  positions.reserve(width * height);
+  indices.reserve(static_cast<size_t>(6 * (width - 1) * (height - 1)));
+  positions.reserve(static_cast<size_t>(width * height));
   for (uint32_t y = 0; y < height; ++y) {
     for (uint32_t x = 0; x < width; ++x) {
       double longitude = beginPoint.longitude + x * dimension;
@@ -179,6 +228,119 @@ CesiumGltf::Model createGlobeGrid(
 
   return model;
 }
+
+// Creates a model with two triangles in opposite corners of the given
+// rectangle. The triangles extend slightly into the other two quadrants.
+CesiumGltf::Model createSparseMesh(const GlobeRectangle& rectangle) {
+  const auto& ellipsoid = Ellipsoid::WGS84;
+
+  double width = rectangle.computeWidth();
+  double height = rectangle.computeHeight();
+
+  // First triangle in southwest corner
+  glm::dvec3 t0p0 = ellipsoid.cartographicToCartesian(rectangle.getSouthwest());
+  glm::dvec3 t0p1 = ellipsoid.cartographicToCartesian(Cartographic(
+      rectangle.getWest() + width * 0.55,
+      rectangle.getSouth() + height * 0.1,
+      0.0));
+  glm::dvec3 t0p2 = ellipsoid.cartographicToCartesian(Cartographic(
+      rectangle.getWest(),
+      rectangle.getSouth() + height * 0.2,
+      0.0));
+
+  // Second triangle in northeast corner
+  glm::dvec3 t1p0 = ellipsoid.cartographicToCartesian(rectangle.getNortheast());
+  glm::dvec3 t1p1 = ellipsoid.cartographicToCartesian(Cartographic(
+      rectangle.getEast() - width * 0.55,
+      rectangle.getNorth() - height * 0.1,
+      0.0));
+  glm::dvec3 t1p2 = ellipsoid.cartographicToCartesian(Cartographic(
+      rectangle.getEast(),
+      rectangle.getNorth() - height * 0.2,
+      0.0));
+
+  std::vector<glm::dvec3> positions{t0p0, t0p1, t0p2, t1p0, t1p1, t1p2};
+  glm::dvec3 center = (t0p0 + t1p0) * 0.5;
+
+  CesiumGltf::Model model;
+  model.asset.version = "2.0";
+
+  CesiumGltf::Mesh& mesh = model.meshes.emplace_back();
+  CesiumGltf::MeshPrimitive& meshPrimitive = mesh.primitives.emplace_back();
+
+  {
+    CesiumGltf::Buffer& positionBuffer = model.buffers.emplace_back();
+    positionBuffer.byteLength =
+        static_cast<int64_t>(positions.size() * sizeof(glm::vec3));
+    positionBuffer.cesium.data.resize(
+        static_cast<size_t>(positionBuffer.byteLength));
+
+    CesiumGltf::BufferView& positionBufferView =
+        model.bufferViews.emplace_back();
+    positionBufferView.buffer = int32_t(model.buffers.size() - 1);
+    positionBufferView.byteOffset = 0;
+    positionBufferView.byteLength = positionBuffer.byteLength;
+    positionBufferView.target = CesiumGltf::BufferView::Target::ARRAY_BUFFER;
+
+    CesiumGltf::Accessor& positionAccessor = model.accessors.emplace_back();
+    positionAccessor.bufferView = int32_t(model.bufferViews.size() - 1);
+    positionAccessor.byteOffset = 0;
+    positionAccessor.componentType = CesiumGltf::Accessor::ComponentType::FLOAT;
+    positionAccessor.count = int64_t(positions.size());
+    positionAccessor.type = CesiumGltf::Accessor::Type::VEC3;
+
+    CesiumGltf::AccessorWriter<glm::vec3> writer(model, positionAccessor);
+    CHECK(writer.size() == int64_t(positions.size()));
+
+    for (size_t i = 0; i < positions.size(); ++i) {
+      writer[int64_t(i)] = glm::vec3(positions[i] - center);
+    }
+
+    meshPrimitive.attributes["POSITION"] = int32_t(model.accessors.size() - 1);
+  }
+
+  {
+    CesiumGltf::Buffer& indicesBuffer = model.buffers.emplace_back();
+    indicesBuffer.byteLength = static_cast<int64_t>(6 * sizeof(uint8_t));
+    indicesBuffer.cesium.data.resize(
+        static_cast<size_t>(indicesBuffer.byteLength));
+
+    CesiumGltf::BufferView& indicesBufferView =
+        model.bufferViews.emplace_back();
+    indicesBufferView.buffer = int32_t(model.buffers.size() - 1);
+    indicesBufferView.byteOffset = 0;
+    indicesBufferView.byteLength = indicesBuffer.byteLength;
+    indicesBufferView.target =
+        CesiumGltf::BufferView::Target::ELEMENT_ARRAY_BUFFER;
+
+    CesiumGltf::Accessor& indicesAccessor = model.accessors.emplace_back();
+    indicesAccessor.bufferView = int32_t(model.bufferViews.size() - 1);
+    indicesAccessor.byteOffset = 0;
+    indicesAccessor.componentType =
+        CesiumGltf::Accessor::ComponentType::UNSIGNED_BYTE;
+    indicesAccessor.count = 6;
+    indicesAccessor.type = CesiumGltf::Accessor::Type::SCALAR;
+
+    CesiumGltf::AccessorWriter<uint8_t> writer(model, indicesAccessor);
+    CHECK(writer.size() == 6);
+
+    for (int64_t i = 0; i < writer.size(); ++i) {
+      writer[i] = uint8_t(i);
+    }
+
+    meshPrimitive.indices = int32_t(model.accessors.size() - 1);
+  }
+
+  CesiumGltf::Node& node = model.nodes.emplace_back();
+  node.translation = {center.x, center.y, center.z};
+  node.mesh = int32_t(model.meshes.size() - 1);
+
+  CesiumGltf::Scene& scene = model.scenes.emplace_back();
+  scene.nodes.emplace_back(int32_t(model.nodes.size() - 1));
+
+  return model;
+}
+
 } // namespace
 
 TEST_CASE("Test the manager can be initialized with correct loaders") {
@@ -198,7 +360,7 @@ TEST_CASE("Test the manager can be initialized with correct loaders") {
       asyncSystem,
       pMockedCreditSystem};
 
-  SECTION("Initialize manager with tileset.json url") {
+  SUBCASE("Initialize manager with tileset.json url") {
     // create mock request
     pMockedAssetAccessor->mockCompletedRequests.insert(
         {"tileset.json",
@@ -229,7 +391,7 @@ TEST_CASE("Test the manager can be initialized with correct loaders") {
     CHECK(pRootTile->getRefine() == TileRefine::Add);
   }
 
-  SECTION("Initialize manager with layer.json url") {
+  SUBCASE("Initialize manager with layer.json url") {
     // create mock request
     pMockedAssetAccessor->mockCompletedRequests.insert(
         {"layer.json",
@@ -257,7 +419,7 @@ TEST_CASE("Test the manager can be initialized with correct loaders") {
     CHECK(pRootTile);
     CHECK(pRootTile->getRefine() == TileRefine::Replace);
 
-    const gsl::span<const Tile> children = pRootTile->getChildren();
+    const std::span<const Tile> children = pRootTile->getChildren();
     CHECK(
         std::get<QuadtreeTileID>(children[0].getTileID()) ==
         QuadtreeTileID(0, 0, 0));
@@ -266,7 +428,7 @@ TEST_CASE("Test the manager can be initialized with correct loaders") {
         QuadtreeTileID(0, 1, 0));
   }
 
-  SECTION("Initialize manager with wrong format") {
+  SUBCASE("Initialize manager with wrong format") {
     pMockedAssetAccessor->mockCompletedRequests.insert(
         {"layer.json",
          createMockRequest(
@@ -311,7 +473,7 @@ TEST_CASE("Test tile state machine") {
       asyncSystem,
       pMockedCreditSystem};
 
-  SECTION("Load content successfully") {
+  SUBCASE("Load content successfully") {
     // create mock loader
     bool initializerCall = false;
     auto pMockedLoader = std::make_unique<SimpleTilesetContentLoader>();
@@ -322,8 +484,10 @@ TEST_CASE("Test tile state machine") {
         std::nullopt,
         std::nullopt,
         nullptr,
+        nullptr,
         [&](Tile&) { initializerCall = true; },
-        TileLoadResultState::Success};
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Success};
     pMockedLoader->mockCreateTileChildren.children.emplace_back(
         pMockedLoader.get(),
@@ -342,7 +506,6 @@ TEST_CASE("Test tile state machine") {
             externals,
             options,
             RasterOverlayCollection{loadedTiles, externals},
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
@@ -350,7 +513,7 @@ TEST_CASE("Test tile state machine") {
     Tile& tile = *pManager->getRootTile();
     pManager->loadTileContent(tile, options);
 
-    SECTION("Load tile from ContentLoading -> Done") {
+    SUBCASE("Load tile from ContentLoading -> Done") {
       // Unloaded -> ContentLoading
       // check the state of the tile before main thread get called
       CHECK(pManager->getNumberOfTilesLoading() == 1);
@@ -389,7 +552,7 @@ TEST_CASE("Test tile state machine") {
       CHECK(!tile.getContent().getRenderContent());
     }
 
-    SECTION("Try to unload tile when it's still loading") {
+    SUBCASE("Try to unload tile when it's still loading") {
       // unload tile to move from Done -> Unload
       pManager->unloadTileContent(tile);
       CHECK(pManager->getNumberOfTilesLoading() == 1);
@@ -415,7 +578,7 @@ TEST_CASE("Test tile state machine") {
     }
   }
 
-  SECTION("Loader requests retry later") {
+  SUBCASE("Loader requests retry later") {
     // create mock loader
     bool initializerCall = false;
     auto pMockedLoader = std::make_unique<SimpleTilesetContentLoader>();
@@ -426,8 +589,10 @@ TEST_CASE("Test tile state machine") {
         std::nullopt,
         std::nullopt,
         nullptr,
+        nullptr,
         [&](Tile&) { initializerCall = true; },
-        TileLoadResultState::RetryLater};
+        TileLoadResultState::RetryLater,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Success};
     pMockedLoader->mockCreateTileChildren.children.emplace_back(
         pMockedLoader.get(),
@@ -446,7 +611,6 @@ TEST_CASE("Test tile state machine") {
             externals,
             options,
             RasterOverlayCollection{loadedTiles, externals},
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
@@ -490,7 +654,7 @@ TEST_CASE("Test tile state machine") {
     CHECK(tile.getState() == TileLoadState::ContentLoading);
   }
 
-  SECTION("Loader requests failed") {
+  SUBCASE("Loader requests failed") {
     // create mock loader
     bool initializerCall = false;
     auto pMockedLoader = std::make_unique<SimpleTilesetContentLoader>();
@@ -501,8 +665,10 @@ TEST_CASE("Test tile state machine") {
         std::nullopt,
         std::nullopt,
         nullptr,
+        nullptr,
         [&](Tile&) { initializerCall = true; },
-        TileLoadResultState::Failed};
+        TileLoadResultState::Failed,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Success};
     pMockedLoader->mockCreateTileChildren.children.emplace_back(
         pMockedLoader.get(),
@@ -521,7 +687,6 @@ TEST_CASE("Test tile state machine") {
             externals,
             options,
             RasterOverlayCollection{loadedTiles, externals},
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
@@ -579,7 +744,7 @@ TEST_CASE("Test tile state machine") {
     CHECK(!tile.getContent().getRenderContent());
   }
 
-  SECTION("Make sure the manager loads parent first before loading upsampled "
+  SUBCASE("Make sure the manager loads parent first before loading upsampled "
           "child") {
     // create mock loader
     bool initializerCall = false;
@@ -593,8 +758,10 @@ TEST_CASE("Test tile state machine") {
         std::nullopt,
         std::nullopt,
         nullptr,
+        nullptr,
         [&](Tile&) { initializerCall = true; },
-        TileLoadResultState::Success};
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Failed};
 
     // create tile
@@ -622,7 +789,6 @@ TEST_CASE("Test tile state machine") {
             externals,
             options,
             RasterOverlayCollection{loadedTiles, externals},
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
@@ -665,8 +831,10 @@ TEST_CASE("Test tile state machine") {
         std::nullopt,
         std::nullopt,
         nullptr,
+        nullptr,
         [&](Tile&) { initializerCall = true; },
-        TileLoadResultState::Success};
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
     pMockedLoaderRaw->mockCreateTileChildren = {
         {},
         TileLoadResultState::Failed};
@@ -725,7 +893,7 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
       asyncSystem,
       pMockedCreditSystem};
 
-  SECTION("Resolve external buffers") {
+  SUBCASE("Resolve external buffers") {
     // create mock loader
     CesiumGltfReader::GltfReader gltfReader;
     std::vector<std::byte> gltfBoxFile =
@@ -753,9 +921,11 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
         std::nullopt,
         std::nullopt,
         std::nullopt,
+        pMockedAssetAccessor,
         nullptr,
         {},
-        TileLoadResultState::Success};
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Failed};
 
     // add external buffer to the completed request
@@ -773,7 +943,6 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
             externals,
             {},
             RasterOverlayCollection{loadedTiles, externals},
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
@@ -800,7 +969,7 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
     pManager->unloadTileContent(tile);
   }
 
-  SECTION("Ensure the loader generate smooth normal when the mesh doesn't have "
+  SUBCASE("Ensure the loader generate smooth normal when the mesh doesn't have "
           "normal") {
     CesiumGltfReader::GltfReader gltfReader;
     std::vector<std::byte> gltfBoxFile =
@@ -824,8 +993,10 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
         std::nullopt,
         std::nullopt,
         nullptr,
+        nullptr,
         {},
-        TileLoadResultState::Success};
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Failed};
 
     // create tile
@@ -841,7 +1012,6 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
             externals,
             options,
             RasterOverlayCollection{loadedTiles, externals},
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
@@ -881,7 +1051,7 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
     pManager->unloadTileContent(tile);
   }
 
-  SECTION("Embed gltf up axis to extra") {
+  SUBCASE("Embed gltf up axis to extra") {
     // create mock loader
     auto pMockedLoader = std::make_unique<SimpleTilesetContentLoader>();
     pMockedLoader->mockLoadTileContent = {
@@ -891,8 +1061,10 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
         std::nullopt,
         std::nullopt,
         nullptr,
+        nullptr,
         {},
-        TileLoadResultState::Success};
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Failed};
 
     // create tile
@@ -905,7 +1077,6 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
             externals,
             {},
             RasterOverlayCollection{loadedTiles, externals},
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
@@ -923,7 +1094,7 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
     pManager->unloadTileContent(tile);
   }
 
-  SECTION("Generate raster overlay projections") {
+  SUBCASE("Generate raster overlay projections") {
     // add raster overlay
     Tile::LoadedLinkedList loadedTiles;
     RasterOverlayCollection rasterOverlayCollection{loadedTiles, externals};
@@ -941,8 +1112,10 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
         std::nullopt,
         std::nullopt,
         nullptr,
+        nullptr,
         {},
-        TileLoadResultState::Success};
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Failed};
 
     // create tile
@@ -954,12 +1127,11 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
             externals,
             {},
             std::move(rasterOverlayCollection),
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
-    SECTION(
-        "Generate raster overlay details when tile don't have loose region") {
+    SUBCASE(
+        "Generate raster overlay details when tile doesn't have loose region") {
       // test the gltf model
       Tile& tile = *pManager->getRootTile();
       pManager->loadTileContent(tile, {});
@@ -972,7 +1144,7 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
           tileContent.getRenderContent()->getRasterOverlayDetails();
 
       // ensure the raster overlay details has geographic projection
-      GeographicProjection geographicProjection{};
+      GeographicProjection geographicProjection{Ellipsoid::WGS84};
       auto existingProjectionIt = std::find(
           rasterOverlayDetails.rasterOverlayProjections.begin(),
           rasterOverlayDetails.rasterOverlayProjections.end(),
@@ -1016,13 +1188,14 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
       }
     }
 
-    SECTION("Generate raster overlay details when tile has loose region") {
+    SUBCASE("Generate raster overlay details when tile has loose region") {
       Tile& tile = *pManager->getRootTile();
       auto originalLooseRegion =
           BoundingRegionWithLooseFittingHeights{BoundingRegion{
               GeographicProjection::MAXIMUM_GLOBE_RECTANGLE,
               -1000.0,
-              9000.0}};
+              9000.0,
+              Ellipsoid::WGS84}};
       tile.setBoundingVolume(originalLooseRegion);
 
       pManager->loadTileContent(tile, {});
@@ -1035,7 +1208,7 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
           tileContent.getRenderContent()->getRasterOverlayDetails();
 
       // ensure the raster overlay details has geographic projection
-      GeographicProjection geographicProjection{};
+      GeographicProjection geographicProjection{Ellipsoid::WGS84};
       auto existingProjectionIt = std::find(
           rasterOverlayDetails.rasterOverlayProjections.begin(),
           rasterOverlayDetails.rasterOverlayProjections.end(),
@@ -1104,7 +1277,7 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
       }
     }
 
-    SECTION("Automatically calculate fit bounding region when tile has loose "
+    SUBCASE("Automatically calculate fit bounding region when tile has loose "
             "region") {
       auto pRemovedOverlay =
           pManager->getRasterOverlayCollection().begin()->get();
@@ -1116,7 +1289,8 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
           BoundingRegionWithLooseFittingHeights{BoundingRegion{
               GeographicProjection::MAXIMUM_GLOBE_RECTANGLE,
               -1000.0,
-              9000.0}};
+              9000.0,
+              Ellipsoid::WGS84}};
       tile.setBoundingVolume(originalLooseRegion);
 
       pManager->loadTileContent(tile, {});
@@ -1140,7 +1314,284 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
     }
   }
 
-  SECTION("Don't generate raster overlay for existing projection") {
+  SUBCASE("Upsamples sparse tile for raster overlays") {
+    // add raster overlay
+    Tile::LoadedLinkedList loadedTiles;
+    RasterOverlayCollection rasterOverlayCollection{loadedTiles, externals};
+
+    class AlwaysMoreDetailProvider : public RasterOverlayTileProvider {
+    public:
+      AlwaysMoreDetailProvider(
+          const CesiumUtility::IntrusivePointer<const RasterOverlay>& pOwner,
+          const CesiumAsync::AsyncSystem& asyncSystem,
+          const std::shared_ptr<CesiumAsync::IAssetAccessor>& pAssetAccessor,
+          std::optional<CesiumUtility::Credit> credit,
+          const std::shared_ptr<IPrepareRasterOverlayRendererResources>&
+              pPrepareRendererResources,
+          const std::shared_ptr<spdlog::logger>& pLogger,
+          const CesiumGeospatial::Projection& projection,
+          const CesiumGeometry::Rectangle& coverageRectangle)
+          : RasterOverlayTileProvider(
+                pOwner,
+                asyncSystem,
+                pAssetAccessor,
+                credit,
+                pPrepareRendererResources,
+                pLogger,
+                projection,
+                coverageRectangle) {}
+
+      CesiumAsync::Future<LoadedRasterOverlayImage>
+      loadTileImage(RasterOverlayTile& overlayTile) override {
+        CesiumUtility::IntrusivePointer<CesiumGltf::ImageAsset> pImage;
+        CesiumGltf::ImageAsset& image = pImage.emplace();
+        image.width = 1;
+        image.height = 1;
+        image.channels = 1;
+        image.bytesPerChannel = 1;
+        image.pixelData.resize(1, std::byte(255));
+
+        return this->getAsyncSystem().createResolvedFuture(
+            LoadedRasterOverlayImage{
+                std::move(pImage),
+                overlayTile.getRectangle(),
+                {},
+                {},
+                true});
+      }
+    };
+
+    class AlwaysMoreDetailRasterOverlay : public RasterOverlay {
+    public:
+      AlwaysMoreDetailRasterOverlay() : RasterOverlay("AlwaysMoreDetail") {}
+
+      CesiumAsync::Future<CreateTileProviderResult> createTileProvider(
+          const CesiumAsync::AsyncSystem& asyncSystem,
+          const std::shared_ptr<CesiumAsync::IAssetAccessor>& pAssetAccessor,
+          const std::shared_ptr<
+              CesiumUtility::CreditSystem>& /* pCreditSystem */,
+          const std::shared_ptr<IPrepareRasterOverlayRendererResources>&
+              pPrepareRendererResources,
+          const std::shared_ptr<spdlog::logger>& pLogger,
+          CesiumUtility::IntrusivePointer<const RasterOverlay> pOwner)
+          const override {
+        return asyncSystem.createResolvedFuture(CreateTileProviderResult(
+            CesiumUtility::IntrusivePointer<RasterOverlayTileProvider>(
+                new AlwaysMoreDetailProvider(
+                    pOwner ? pOwner : this,
+                    asyncSystem,
+                    pAssetAccessor,
+                    std::nullopt,
+                    pPrepareRendererResources,
+                    pLogger,
+                    CesiumGeospatial::GeographicProjection(),
+                    projectRectangleSimple(
+                        CesiumGeospatial::GeographicProjection(),
+                        GlobeRectangle::MAXIMUM)))));
+      }
+    };
+
+    rasterOverlayCollection.add(new AlwaysMoreDetailRasterOverlay());
+    asyncSystem.dispatchMainThreadTasks();
+
+    // create mock loader
+    auto pMockedLoader = std::make_unique<SimpleTilesetContentLoader>();
+    GlobeRectangle tileRectangle =
+        GlobeRectangle::fromDegrees(0.0010, 0.0011, 0.0012, 0.0013);
+    pMockedLoader->mockLoadTileContent = {
+        createSparseMesh(tileRectangle),
+        CesiumGeometry::Axis::Z,
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        nullptr,
+        nullptr,
+        {},
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
+    pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Success};
+
+    // create tile
+    auto pRootTile = std::make_unique<Tile>(pMockedLoader.get());
+
+    // create manager
+    IntrusivePointer<TilesetContentManager> pManager =
+        new TilesetContentManager{
+            externals,
+            {},
+            std::move(rasterOverlayCollection),
+            std::move(pMockedLoader),
+            std::move(pRootTile)};
+
+    SUBCASE(
+        "Generate raster overlay details when tile doesn't have loose region") {
+      // test the gltf model
+      Tile& tile = *pManager->getRootTile();
+
+      auto loadUntilChildrenExist = [pManager, &asyncSystem](Tile& tile) {
+        while (tile.getChildren().empty()) {
+          pManager->loadTileContent(tile, {});
+          asyncSystem.dispatchMainThreadTasks();
+          pManager->updateTileContent(tile, {});
+          asyncSystem.dispatchMainThreadTasks();
+        }
+      };
+
+      loadUntilChildrenExist(tile);
+
+      CHECK(tile.getState() == TileLoadState::Done);
+      const TileContent& tileContent = tile.getContent();
+      CHECK(tileContent.isRenderContent());
+      const RasterOverlayDetails& rasterOverlayDetails =
+          tileContent.getRenderContent()->getRasterOverlayDetails();
+
+      // ensure the raster overlay details has geographic projection
+      GeographicProjection geographicProjection{Ellipsoid::WGS84};
+      auto existingProjectionIt = std::find(
+          rasterOverlayDetails.rasterOverlayProjections.begin(),
+          rasterOverlayDetails.rasterOverlayProjections.end(),
+          Projection{geographicProjection});
+      CHECK(
+          existingProjectionIt !=
+          rasterOverlayDetails.rasterOverlayProjections.end());
+
+      // Both the raster overlay boundingRegion and rectangle should match the
+      // tile rectangle.
+      REQUIRE(!rasterOverlayDetails.rasterOverlayRectangles.empty());
+      const Rectangle& projectionRectangle =
+          rasterOverlayDetails.rasterOverlayRectangles.front();
+      GlobeRectangle globeRectangle =
+          geographicProjection.unproject(projectionRectangle);
+      CHECK(GlobeRectangle::equalsEpsilon(
+          globeRectangle,
+          tileRectangle,
+          Math::Epsilon13));
+      CHECK(GlobeRectangle::equalsEpsilon(
+          rasterOverlayDetails.boundingRegion.getRectangle(),
+          tileRectangle,
+          Math::Epsilon13));
+
+      // Load the southeast child
+      REQUIRE(tile.getChildren().size() == 4);
+      Tile& se = tile.getChildren()[1];
+      REQUIRE(std::get_if<UpsampledQuadtreeNode>(&se.getTileID()) != nullptr);
+      REQUIRE(
+          std::get<UpsampledQuadtreeNode>(se.getTileID()).tileID ==
+          QuadtreeTileID(1, 1, 0));
+
+      loadUntilChildrenExist(se);
+
+      // Verify the bounding volume is sensible
+      const BoundingRegion* pRegion =
+          std::get_if<BoundingRegion>(&se.getBoundingVolume());
+      REQUIRE(pRegion != nullptr);
+      CHECK(
+          pRegion->getRectangle().getEast() >
+          pRegion->getRectangle().getWest());
+      CHECK(
+          pRegion->getRectangle().getNorth() >
+          pRegion->getRectangle().getSouth());
+
+      // The tight-fitting bounding region from the raster overlay process
+      // should be sensible and smaller than the _original_ tile rectangle.
+      TileRenderContent* pRenderContent = se.getContent().getRenderContent();
+      REQUIRE(pRenderContent != nullptr);
+      const GlobeRectangle& tightRectangle =
+          pRenderContent->getRasterOverlayDetails()
+              .boundingRegion.getRectangle();
+      CHECK(tightRectangle.getEast() > tightRectangle.getWest());
+      CHECK(tightRectangle.getNorth() > tightRectangle.getSouth());
+      CHECK(
+          tightRectangle.computeWidth() * 2.0 <
+          tileRectangle.computeWidth() * 0.5);
+      CHECK(
+          tightRectangle.computeHeight() * 2.0 <
+          tileRectangle.computeHeight() * 0.5);
+
+      // The rectangle used for texture coordinates should also be sensible and
+      // match the southeast quadrant of the original parent tile rectangle.
+      REQUIRE(!pRenderContent->getRasterOverlayDetails()
+                   .rasterOverlayRectangles.empty());
+      const Rectangle& overlayRectangle =
+          pRenderContent->getRasterOverlayDetails()
+              .rasterOverlayRectangles.front();
+      GlobeRectangle overlayGlobeRectangle =
+          unprojectRectangleSimple(GeographicProjection(), overlayRectangle);
+
+      GlobeRectangle seQuadrant(
+          tileRectangle.computeCenter().longitude,
+          tileRectangle.getSouth(),
+          tileRectangle.getEast(),
+          tileRectangle.computeCenter().latitude);
+      CHECK(GlobeRectangle::equalsEpsilon(
+          overlayGlobeRectangle,
+          seQuadrant,
+          Math::Epsilon13));
+
+      // The tile should have a raster overlay mapped to it.
+      REQUIRE(se.getMappedRasterTiles().size() == 1);
+
+      // Load the southeast child's southwest child
+      REQUIRE(se.getChildren().size() == 4);
+      Tile& sw = se.getChildren()[0];
+      REQUIRE(std::get_if<UpsampledQuadtreeNode>(&sw.getTileID()) != nullptr);
+      REQUIRE(
+          std::get<UpsampledQuadtreeNode>(sw.getTileID()).tileID ==
+          QuadtreeTileID(2, 2, 0));
+
+      loadUntilChildrenExist(sw);
+
+      // Verify the bounding volume is sensible
+      pRegion = std::get_if<BoundingRegion>(&sw.getBoundingVolume());
+      REQUIRE(pRegion != nullptr);
+      CHECK(
+          pRegion->getRectangle().getEast() >
+          pRegion->getRectangle().getWest());
+      CHECK(
+          pRegion->getRectangle().getNorth() >
+          pRegion->getRectangle().getSouth());
+
+      // The tight-fitting bounding region from the raster overlay process
+      // should be sensible and smaller than the _original_ tile rectangle.
+      pRenderContent = sw.getContent().getRenderContent();
+      REQUIRE(pRenderContent != nullptr);
+      const GlobeRectangle& swTightRectangle =
+          pRenderContent->getRasterOverlayDetails()
+              .boundingRegion.getRectangle();
+      CHECK(swTightRectangle.getEast() > swTightRectangle.getWest());
+      CHECK(swTightRectangle.getNorth() > swTightRectangle.getSouth());
+      CHECK(
+          swTightRectangle.computeWidth() * 2.0 <
+          tileRectangle.computeWidth() * 0.25);
+      CHECK(
+          swTightRectangle.computeHeight() * 2.0 <
+          tileRectangle.computeHeight() * 0.25);
+
+      // The rectangle used for texture coordinates should also be sensible and
+      // match the southwest quadrant of the southeast quadrant of the original
+      // parent tile rectangle.
+      REQUIRE(!pRenderContent->getRasterOverlayDetails()
+                   .rasterOverlayRectangles.empty());
+      const Rectangle& swOverlayRectangle =
+          pRenderContent->getRasterOverlayDetails()
+              .rasterOverlayRectangles.front();
+      GlobeRectangle swOverlayGlobeRectangle =
+          unprojectRectangleSimple(GeographicProjection(), swOverlayRectangle);
+      CHECK(GlobeRectangle::equalsEpsilon(
+          swOverlayGlobeRectangle,
+          GlobeRectangle(
+              seQuadrant.getWest(),
+              seQuadrant.getSouth(),
+              seQuadrant.computeCenter().longitude,
+              seQuadrant.computeCenter().latitude),
+          Math::Epsilon13));
+
+      // The tile should have a raster overlay mapped to it.
+      REQUIRE(sw.getMappedRasterTiles().size() == 1);
+    }
+  }
+
+  SUBCASE("Don't generate raster overlay for existing projection") {
     // create gltf grid
     Cartographic beginCarto{glm::radians(32.0), glm::radians(48.0), 100.0};
     CesiumGltf::Model model = createGlobeGrid(beginCarto, 10, 10, 0.01);
@@ -1149,7 +1600,7 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
             CesiumGeometry::Axis::Z);
 
     // mock raster overlay detail
-    GeographicProjection projection;
+    GeographicProjection projection(Ellipsoid::WGS84);
     RasterOverlayDetails rasterOverlayDetails;
     rasterOverlayDetails.rasterOverlayProjections.emplace_back(projection);
     rasterOverlayDetails.rasterOverlayRectangles.emplace_back(
@@ -1157,7 +1608,8 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
     rasterOverlayDetails.boundingRegion = BoundingRegion{
         GeographicProjection::MAXIMUM_GLOBE_RECTANGLE,
         -1000.0,
-        9000.0};
+        9000.0,
+        Ellipsoid::WGS84};
 
     // add raster overlay
     Tile::LoadedLinkedList loadedTiles;
@@ -1175,8 +1627,10 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
         std::nullopt,
         std::move(rasterOverlayDetails),
         nullptr,
+        nullptr,
         {},
-        TileLoadResultState::Success};
+        TileLoadResultState::Success,
+        Ellipsoid::WGS84};
     pMockedLoader->mockCreateTileChildren = {{}, TileLoadResultState::Failed};
 
     // create tile
@@ -1188,7 +1642,6 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
             externals,
             {},
             std::move(rasterOverlayCollection),
-            {},
             std::move(pMockedLoader),
             std::move(pRootTile)};
 
@@ -1219,5 +1672,82 @@ TEST_CASE("Test the tileset content manager's post processing for gltf") {
     }
 
     pManager->unloadTileContent(tile);
+  }
+
+  SUBCASE("Resolve external images, with deduplication") {
+    std::filesystem::path dirPath(testDataPath / "SharedImages");
+
+    // mock the requests for all files
+    for (const auto& entry : std::filesystem::directory_iterator(dirPath)) {
+      pMockedAssetAccessor->mockCompletedRequests.insert(
+          {entry.path().filename().string(), createMockRequest(entry.path())});
+    }
+
+    std::filesystem::path tilesetPath(dirPath / "tileset.json");
+    auto pExternals = createMockJsonTilesetExternals(
+        tilesetPath.string(),
+        pMockedAssetAccessor);
+
+    auto pJsonLoaderFuture =
+        TilesetJsonLoader::createLoader(pExternals, tilesetPath.string(), {});
+
+    externals.asyncSystem.dispatchMainThreadTasks();
+
+    auto loaderResult = pJsonLoaderFuture.wait();
+
+    REQUIRE(loaderResult.pRootTile);
+    REQUIRE(loaderResult.pRootTile->getChildren().size() == 1);
+
+    auto& rootTile = *loaderResult.pRootTile;
+    auto& containerTile = rootTile.getChildren()[0];
+
+    REQUIRE(containerTile.getChildren().size() == 100);
+
+    // create manager
+    Tile::LoadedLinkedList loadedTiles;
+    IntrusivePointer<TilesetContentManager> pManager =
+        new TilesetContentManager{
+            externals,
+            {},
+            RasterOverlayCollection{loadedTiles, externals},
+            std::move(loaderResult.pLoader),
+            std::move(loaderResult.pRootTile)};
+
+    for (auto& child : containerTile.getChildren()) {
+      pManager->loadTileContent(child, {});
+      externals.asyncSystem.dispatchMainThreadTasks();
+      pManager->waitUntilIdle();
+
+      CHECK(child.getState() == TileLoadState::ContentLoaded);
+      CHECK(child.isRenderContent());
+
+      const auto& renderContent = child.getContent().getRenderContent();
+      const auto& images = renderContent->getModel().images;
+      CHECK(images.size() == 1);
+    }
+
+    CHECK(
+        pManager->getSharedAssetSystem()
+            ->pImage->getInactiveAssetTotalSizeBytes() == 0);
+    CHECK(pManager->getSharedAssetSystem()->pImage->getAssetCount() == 2);
+    CHECK(pManager->getSharedAssetSystem()->pImage->getActiveAssetCount() == 2);
+    CHECK(
+        pManager->getSharedAssetSystem()->pImage->getInactiveAssetCount() == 0);
+
+    // unload the tile content
+    for (auto& child : containerTile.getChildren()) {
+      pManager->unloadTileContent(child);
+    }
+
+    // Both of the assets will become inactive, and one of them will be
+    // destroyed, in order to bring the total under the limit.
+    CHECK(
+        pManager->getSharedAssetSystem()
+            ->pImage->getInactiveAssetTotalSizeBytes() <=
+        pManager->getSharedAssetSystem()->pImage->inactiveAssetSizeLimitBytes);
+    CHECK(pManager->getSharedAssetSystem()->pImage->getAssetCount() == 1);
+    CHECK(pManager->getSharedAssetSystem()->pImage->getActiveAssetCount() == 0);
+    CHECK(
+        pManager->getSharedAssetSystem()->pImage->getInactiveAssetCount() == 1);
   }
 }

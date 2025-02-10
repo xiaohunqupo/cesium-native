@@ -1,22 +1,29 @@
-#include "CesiumIonClient/Response.h"
-
-#include "CesiumIonClient/Assets.h"
-#include "CesiumIonClient/Profile.h"
-#include "CesiumIonClient/TokenList.h"
 #include "parseLinkHeader.h"
 
+#include <CesiumAsync/HttpHeaders.h>
 #include <CesiumAsync/IAssetRequest.h>
 #include <CesiumAsync/IAssetResponse.h>
+#include <CesiumIonClient/ApplicationData.h>
+#include <CesiumIonClient/Assets.h>
+#include <CesiumIonClient/Defaults.h>
+#include <CesiumIonClient/Geocoder.h>
+#include <CesiumIonClient/Profile.h>
+#include <CesiumIonClient/Response.h>
+#include <CesiumIonClient/Token.h>
+#include <CesiumIonClient/TokenList.h>
 #include <CesiumUtility/Uri.h>
 
-#include <cassert>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
 using namespace CesiumAsync;
 using namespace CesiumUtility;
 
 namespace CesiumIonClient {
 
-template <typename T> Response<T>::Response() {}
+template <typename T> Response<T>::Response() = default;
 
 template <typename T>
 Response<T>::Response(
@@ -73,9 +80,12 @@ Response<T>::Response(
 // Explicit instantiations
 template struct Response<Asset>;
 template struct Response<Assets>;
+template struct Response<Defaults>;
 template struct Response<NoValue>;
 template struct Response<Profile>;
 template struct Response<Token>;
 template struct Response<TokenList>;
+template struct Response<ApplicationData>;
+template struct Response<GeocoderResult>;
 
 } // namespace CesiumIonClient

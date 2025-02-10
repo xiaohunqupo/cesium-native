@@ -1,9 +1,37 @@
-#include "CesiumGltf/PropertyTablePropertyView.h"
-#include "CesiumGltf/PropertyTableView.h"
+#include <CesiumGltf/Buffer.h>
+#include <CesiumGltf/BufferView.h>
+#include <CesiumGltf/Class.h>
+#include <CesiumGltf/ClassProperty.h>
+#include <CesiumGltf/ExtensionModelExtStructuralMetadata.h>
+#include <CesiumGltf/Model.h>
+#include <CesiumGltf/PropertyArrayView.h>
+#include <CesiumGltf/PropertyTable.h>
+#include <CesiumGltf/PropertyTableProperty.h>
+#include <CesiumGltf/PropertyTablePropertyView.h>
+#include <CesiumGltf/PropertyTableView.h>
+#include <CesiumGltf/PropertyTransformations.h>
+#include <CesiumGltf/Schema.h>
 
-#include <catch2/catch.hpp>
+#include <doctest/doctest.h>
+#include <glm/common.hpp>
+#include <glm/ext/matrix_double2x2.hpp>
+#include <glm/ext/matrix_float2x2.hpp>
+#include <glm/ext/vector_double3.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_int2.hpp>
+#include <glm/ext/vector_int3.hpp>
+#include <glm/ext/vector_int3_sized.hpp>
+#include <glm/ext/vector_uint2.hpp>
+#include <glm/ext/vector_uint3.hpp>
+#include <glm/ext/vector_uint3_sized.hpp>
+#include <glm/fwd.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <optional>
+#include <string_view>
+#include <vector>
 
 using namespace CesiumGltf;
 
@@ -136,7 +164,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
   REQUIRE(!classProperty->array);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
     REQUIRE(uint32Property.status() == PropertyTablePropertyViewStatus::Valid);
@@ -148,7 +176,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyTablePropertyView<glm::uvec3> uvec3Invalid =
         view.getPropertyView<glm::uvec3>("TestClassProperty");
     REQUIRE(
@@ -174,7 +202,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyTablePropertyView<uint8_t> uint8Invalid =
         view.getPropertyView<uint8_t>("TestClassProperty");
     REQUIRE(
@@ -194,7 +222,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as normalized") {
+  SUBCASE("Access incorrectly as normalized") {
     PropertyTablePropertyView<uint32_t, true> uint32NormalizedInvalid =
         view.getPropertyView<uint32_t, true>("TestClassProperty");
     REQUIRE(
@@ -202,7 +230,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Wrong buffer index") {
+  SUBCASE("Wrong buffer index") {
     model.bufferViews[valueBufferViewIndex].buffer = 2;
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
@@ -211,7 +239,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorInvalidValueBuffer);
   }
 
-  SECTION("Wrong buffer view index") {
+  SUBCASE("Wrong buffer view index") {
     propertyTableProperty.values = -1;
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
@@ -220,7 +248,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorInvalidValueBufferView);
   }
 
-  SECTION("Buffer view points outside of the real buffer length") {
+  SUBCASE("Buffer view points outside of the real buffer length") {
     model.buffers[valueBufferIndex].cesium.data.resize(12);
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
@@ -229,7 +257,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorBufferViewOutOfBounds);
   }
 
-  SECTION("Buffer view length isn't multiple of sizeof(T)") {
+  SUBCASE("Buffer view length isn't multiple of sizeof(T)") {
     model.bufferViews[valueBufferViewIndex].byteLength = 13;
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
@@ -239,7 +267,7 @@ TEST_CASE("Test scalar PropertyTableProperty") {
             ErrorBufferViewSizeNotDivisibleByTypeSize);
   }
 
-  SECTION("Buffer view length doesn't match with propertyTableCount") {
+  SUBCASE("Buffer view length doesn't match with propertyTableCount") {
     model.bufferViews[valueBufferViewIndex].byteLength = 12;
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
@@ -288,7 +316,7 @@ TEST_CASE("Test scalar PropertyTableProperty (normalized)") {
   REQUIRE(classProperty->normalized);
   REQUIRE(!classProperty->array);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<int16_t, true> int16Property =
         view.getPropertyView<int16_t, true>("TestClassProperty");
     REQUIRE(int16Property.status() == PropertyTablePropertyViewStatus::Valid);
@@ -301,7 +329,7 @@ TEST_CASE("Test scalar PropertyTableProperty (normalized)") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyTablePropertyView<glm::i16vec3, true> i16vec3Invalid =
         view.getPropertyView<glm::i16vec3, true>("TestClassProperty");
     REQUIRE(
@@ -315,7 +343,7 @@ TEST_CASE("Test scalar PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyTablePropertyView<uint16_t, true> uint16Invalid =
         view.getPropertyView<uint16_t, true>("TestClassProperty");
     REQUIRE(
@@ -329,7 +357,7 @@ TEST_CASE("Test scalar PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as array") {
+  SUBCASE("Access incorrectly as array") {
     PropertyTablePropertyView<PropertyArrayView<int16_t>, true> arrayInvalid =
         view.getPropertyView<PropertyArrayView<int16_t>, true>(
             "TestClassProperty");
@@ -338,7 +366,7 @@ TEST_CASE("Test scalar PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Access incorrectly as non-normalized") {
+  SUBCASE("Access incorrectly as non-normalized") {
     PropertyTablePropertyView<int16_t> nonNormalizedInvalid =
         view.getPropertyView<int16_t>("TestClassProperty");
     REQUIRE(
@@ -346,7 +374,7 @@ TEST_CASE("Test scalar PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Access incorrectly as double") {
+  SUBCASE("Access incorrectly as double") {
     PropertyTablePropertyView<double> doubleInvalid =
         view.getPropertyView<double>("TestClassProperty");
     REQUIRE(
@@ -397,7 +425,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
   REQUIRE(!classProperty->array);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<glm::ivec3> ivec3Property =
         view.getPropertyView<glm::ivec3>("TestClassProperty");
     REQUIRE(ivec3Property.status() == PropertyTablePropertyViewStatus::Valid);
@@ -409,7 +437,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyTablePropertyView<int32_t> int32Invalid =
         view.getPropertyView<int32_t>("TestClassProperty");
     REQUIRE(
@@ -441,7 +469,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyTablePropertyView<glm::u8vec3> u8vec3Invalid =
         view.getPropertyView<glm::u8vec3>("TestClassProperty");
     REQUIRE(
@@ -461,7 +489,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as array") {
+  SUBCASE("Access incorrectly as array") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> ivec3ArrayInvalid =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
             "TestClassProperty");
@@ -470,7 +498,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Access incorrectly as normalized") {
+  SUBCASE("Access incorrectly as normalized") {
     PropertyTablePropertyView<glm::ivec3, true> normalizedInvalid =
         view.getPropertyView<glm::ivec3, true>("TestClassProperty");
     REQUIRE(
@@ -478,7 +506,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Wrong buffer index") {
+  SUBCASE("Wrong buffer index") {
     model.bufferViews[valueBufferViewIndex].buffer = 2;
     PropertyTablePropertyView<glm::ivec3> ivec3Property =
         view.getPropertyView<glm::ivec3>("TestClassProperty");
@@ -487,7 +515,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorInvalidValueBuffer);
   }
 
-  SECTION("Wrong buffer view index") {
+  SUBCASE("Wrong buffer view index") {
     propertyTableProperty.values = -1;
     PropertyTablePropertyView<glm::ivec3> ivec3Property =
         view.getPropertyView<glm::ivec3>("TestClassProperty");
@@ -496,7 +524,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorInvalidValueBufferView);
   }
 
-  SECTION("Buffer view points outside of the real buffer length") {
+  SUBCASE("Buffer view points outside of the real buffer length") {
     model.buffers[valueBufferIndex].cesium.data.resize(12);
     PropertyTablePropertyView<glm::ivec3> ivec3Property =
         view.getPropertyView<glm::ivec3>("TestClassProperty");
@@ -505,7 +533,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorBufferViewOutOfBounds);
   }
 
-  SECTION("Buffer view length isn't multiple of sizeof(T)") {
+  SUBCASE("Buffer view length isn't multiple of sizeof(T)") {
     model.bufferViews[valueBufferViewIndex].byteLength = 11;
     PropertyTablePropertyView<glm::ivec3> ivec3Property =
         view.getPropertyView<glm::ivec3>("TestClassProperty");
@@ -515,7 +543,7 @@ TEST_CASE("Test vecN PropertyTableProperty") {
             ErrorBufferViewSizeNotDivisibleByTypeSize);
   }
 
-  SECTION("Buffer view length doesn't match with propertyTableCount") {
+  SUBCASE("Buffer view length doesn't match with propertyTableCount") {
     model.bufferViews[valueBufferViewIndex].byteLength = 12;
     PropertyTablePropertyView<glm::ivec3> ivec3Property =
         view.getPropertyView<glm::ivec3>("TestClassProperty");
@@ -568,7 +596,7 @@ TEST_CASE("Test vecN PropertyTableProperty (normalized)") {
   REQUIRE(!classProperty->array);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<glm::ivec3, true> ivec3Property =
         view.getPropertyView<glm::ivec3, true>("TestClassProperty");
     REQUIRE(ivec3Property.status() == PropertyTablePropertyViewStatus::Valid);
@@ -581,7 +609,7 @@ TEST_CASE("Test vecN PropertyTableProperty (normalized)") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyTablePropertyView<int32_t, true> int32Invalid =
         view.getPropertyView<int32_t, true>("TestClassProperty");
     REQUIRE(
@@ -601,7 +629,7 @@ TEST_CASE("Test vecN PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyTablePropertyView<glm::u8vec3, true> u8vec3Invalid =
         view.getPropertyView<glm::u8vec3, true>("TestClassProperty");
     REQUIRE(
@@ -615,7 +643,7 @@ TEST_CASE("Test vecN PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as array") {
+  SUBCASE("Access incorrectly as array") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> ivec3ArrayInvalid =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
             "TestClassProperty");
@@ -624,7 +652,7 @@ TEST_CASE("Test vecN PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Access incorrectly as non-normalized") {
+  SUBCASE("Access incorrectly as non-normalized") {
     PropertyTablePropertyView<glm::ivec3> nonNormalizedInvalid =
         view.getPropertyView<glm::ivec3>("TestClassProperty");
     REQUIRE(
@@ -632,7 +660,7 @@ TEST_CASE("Test vecN PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Access incorrectly as dvec3") {
+  SUBCASE("Access incorrectly as dvec3") {
     PropertyTablePropertyView<glm::dvec3> dvec3Invalid =
         view.getPropertyView<glm::dvec3>("TestClassProperty");
     REQUIRE(
@@ -693,7 +721,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
   REQUIRE(!classProperty->array);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<glm::umat2x2> umat2x2Property =
         view.getPropertyView<glm::umat2x2>("TestClassProperty");
     REQUIRE(umat2x2Property.status() == PropertyTablePropertyViewStatus::Valid);
@@ -705,7 +733,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyTablePropertyView<uint32_t> uint32Invalid =
         view.getPropertyView<uint32_t>("TestClassProperty");
     REQUIRE(
@@ -737,17 +765,17 @@ TEST_CASE("Test matN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyTablePropertyView<glm::u8mat2x2> u8mat2x2Invalid =
         view.getPropertyView<glm::u8mat2x2>("TestClassProperty");
     REQUIRE(
         u8mat2x2Invalid.status() ==
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
 
-    PropertyTablePropertyView<glm::i32mat2x2> i32mat2x2Invalid =
-        view.getPropertyView<glm::i32mat2x2>("TestClassProperty");
+    PropertyTablePropertyView<glm::imat2x2> imat2x2Invalid =
+        view.getPropertyView<glm::imat2x2>("TestClassProperty");
     REQUIRE(
-        i32mat2x2Invalid.status() ==
+        imat2x2Invalid.status() ==
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
 
     PropertyTablePropertyView<glm::mat2> mat2Invalid =
@@ -757,7 +785,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as array") {
+  SUBCASE("Access incorrectly as array") {
     PropertyTablePropertyView<PropertyArrayView<glm::umat2x2>> arrayInvalid =
         view.getPropertyView<PropertyArrayView<glm::umat2x2>>(
             "TestClassProperty");
@@ -766,7 +794,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Access incorrectly as normalized") {
+  SUBCASE("Access incorrectly as normalized") {
     PropertyTablePropertyView<glm::umat2x2, true> normalizedInvalid =
         view.getPropertyView<glm::umat2x2, true>("TestClassProperty");
     REQUIRE(
@@ -774,7 +802,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Wrong buffer index") {
+  SUBCASE("Wrong buffer index") {
     model.bufferViews[valueBufferViewIndex].buffer = 2;
     PropertyTablePropertyView<glm::umat2x2> umat2x2Property =
         view.getPropertyView<glm::umat2x2>("TestClassProperty");
@@ -783,7 +811,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorInvalidValueBuffer);
   }
 
-  SECTION("Wrong buffer view index") {
+  SUBCASE("Wrong buffer view index") {
     propertyTableProperty.values = -1;
     PropertyTablePropertyView<glm::umat2x2> umat2x2Property =
         view.getPropertyView<glm::umat2x2>("TestClassProperty");
@@ -792,7 +820,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorInvalidValueBufferView);
   }
 
-  SECTION("Buffer view points outside of the real buffer length") {
+  SUBCASE("Buffer view points outside of the real buffer length") {
     model.buffers[valueBufferIndex].cesium.data.resize(sizeof(glm::umat2x2));
     PropertyTablePropertyView<glm::umat2x2> umat2x2Property =
         view.getPropertyView<glm::umat2x2>("TestClassProperty");
@@ -801,7 +829,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorBufferViewOutOfBounds);
   }
 
-  SECTION("Buffer view length isn't multiple of sizeof(T)") {
+  SUBCASE("Buffer view length isn't multiple of sizeof(T)") {
     model.bufferViews[valueBufferViewIndex].byteLength =
         sizeof(glm::umat2x2) * 4 - 1;
     PropertyTablePropertyView<glm::umat2x2> umat2x2Property =
@@ -812,7 +840,7 @@ TEST_CASE("Test matN PropertyTableProperty") {
             ErrorBufferViewSizeNotDivisibleByTypeSize);
   }
 
-  SECTION("Buffer view length doesn't match with propertyTableCount") {
+  SUBCASE("Buffer view length doesn't match with propertyTableCount") {
     model.bufferViews[valueBufferViewIndex].byteLength = sizeof(glm::umat2x2);
 
     PropertyTablePropertyView<glm::umat2x2> umat2x2Property =
@@ -876,7 +904,7 @@ TEST_CASE("Test matN PropertyTableProperty (normalized)") {
   REQUIRE(!classProperty->array);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<glm::umat2x2, true> umat2x2Property =
         view.getPropertyView<glm::umat2x2, true>("TestClassProperty");
     REQUIRE(umat2x2Property.status() == PropertyTablePropertyViewStatus::Valid);
@@ -889,7 +917,7 @@ TEST_CASE("Test matN PropertyTableProperty (normalized)") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyTablePropertyView<uint32_t, true> uint32Invalid =
         view.getPropertyView<uint32_t, true>("TestClassProperty");
     REQUIRE(
@@ -909,21 +937,21 @@ TEST_CASE("Test matN PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyTablePropertyView<glm::u8mat2x2, true> u8mat2x2Invalid =
         view.getPropertyView<glm::u8mat2x2, true>("TestClassProperty");
     REQUIRE(
         u8mat2x2Invalid.status() ==
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
 
-    PropertyTablePropertyView<glm::i32mat2x2, true> i32mat2x2Invalid =
-        view.getPropertyView<glm::i32mat2x2, true>("TestClassProperty");
+    PropertyTablePropertyView<glm::imat2x2, true> imat2x2Invalid =
+        view.getPropertyView<glm::imat2x2, true>("TestClassProperty");
     REQUIRE(
-        i32mat2x2Invalid.status() ==
+        imat2x2Invalid.status() ==
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as array") {
+  SUBCASE("Access incorrectly as array") {
     PropertyTablePropertyView<PropertyArrayView<glm::umat2x2>, true>
         arrayInvalid =
             view.getPropertyView<PropertyArrayView<glm::umat2x2>, true>(
@@ -933,7 +961,7 @@ TEST_CASE("Test matN PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Access incorrectly as non-normalized") {
+  SUBCASE("Access incorrectly as non-normalized") {
     PropertyTablePropertyView<glm::umat2x2> nonNormalizedInvalid =
         view.getPropertyView<glm::umat2x2>("TestClassProperty");
     REQUIRE(
@@ -941,7 +969,7 @@ TEST_CASE("Test matN PropertyTableProperty (normalized)") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Access incorrectly as dmat2") {
+  SUBCASE("Access incorrectly as dmat2") {
     PropertyTablePropertyView<glm::dmat2> dmat2Invalid =
         view.getPropertyView<glm::dmat2>("TestClassProperty");
     REQUIRE(
@@ -1001,7 +1029,7 @@ TEST_CASE("Test boolean PropertyTableProperty") {
   REQUIRE(classProperty->count == std::nullopt);
   REQUIRE(!classProperty->array);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<bool> boolProperty =
         view.getPropertyView<bool>("TestClassProperty");
     REQUIRE(boolProperty.status() == PropertyTablePropertyViewStatus::Valid);
@@ -1013,7 +1041,7 @@ TEST_CASE("Test boolean PropertyTableProperty") {
     }
   }
 
-  SECTION("Buffer size doesn't match with propertyTableCount") {
+  SUBCASE("Buffer size doesn't match with propertyTableCount") {
     propertyTable.count = 66;
     PropertyTablePropertyView<bool> boolProperty =
         view.getPropertyView<bool>("TestClassProperty");
@@ -1087,7 +1115,7 @@ TEST_CASE("Test string PropertyTableProperty") {
   REQUIRE(classProperty->count == std::nullopt);
   REQUIRE(!classProperty->array);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<std::string_view> stringProperty =
         view.getPropertyView<std::string_view>("TestClassProperty");
     REQUIRE(stringProperty.status() == PropertyTablePropertyViewStatus::Valid);
@@ -1097,7 +1125,7 @@ TEST_CASE("Test string PropertyTableProperty") {
     }
   }
 
-  SECTION("Wrong array type") {
+  SUBCASE("Wrong array type") {
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
         stringArrayInvalid =
             view.getPropertyView<PropertyArrayView<std::string_view>>(
@@ -1107,7 +1135,7 @@ TEST_CASE("Test string PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Wrong offset type") {
+  SUBCASE("Wrong offset type") {
     propertyTableProperty.stringOffsetType =
         PropertyTableProperty::StringOffsetType::UINT8;
     PropertyTablePropertyView<std::string_view> stringProperty =
@@ -1143,7 +1171,7 @@ TEST_CASE("Test string PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorInvalidStringOffsetType);
   }
 
-  SECTION("Offset values are not sorted ascending") {
+  SUBCASE("Offset values are not sorted ascending") {
     uint32_t* offset = reinterpret_cast<uint32_t*>(
         model.buffers[offsetBufferIndex].cesium.data.data());
     offset[2] =
@@ -1155,7 +1183,7 @@ TEST_CASE("Test string PropertyTableProperty") {
         PropertyTablePropertyViewStatus::ErrorStringOffsetsNotSorted);
   }
 
-  SECTION("Offset value points outside of value buffer") {
+  SUBCASE("Offset value points outside of value buffer") {
     uint32_t* offset = reinterpret_cast<uint32_t*>(
         model.buffers[offsetBufferIndex].cesium.data.data());
     offset[propertyTable.count] =
@@ -1210,7 +1238,7 @@ TEST_CASE("Test fixed-length scalar array") {
   REQUIRE(classProperty->count == 3);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access the right type") {
+  SUBCASE("Access the right type") {
     PropertyTablePropertyView<PropertyArrayView<uint32_t>> arrayProperty =
         view.getPropertyView<PropertyArrayView<uint32_t>>("TestClassProperty");
     REQUIRE(arrayProperty.status() == PropertyTablePropertyViewStatus::Valid);
@@ -1227,7 +1255,7 @@ TEST_CASE("Test fixed-length scalar array") {
     }
   }
 
-  SECTION("Wrong type") {
+  SUBCASE("Wrong type") {
     PropertyTablePropertyView<PropertyArrayView<bool>> boolArrayInvalid =
         view.getPropertyView<PropertyArrayView<bool>>("TestClassProperty");
     REQUIRE(
@@ -1242,7 +1270,7 @@ TEST_CASE("Test fixed-length scalar array") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Wrong component type") {
+  SUBCASE("Wrong component type") {
     PropertyTablePropertyView<PropertyArrayView<int32_t>> int32ArrayInvalid =
         view.getPropertyView<PropertyArrayView<int32_t>>("TestClassProperty");
     REQUIRE(
@@ -1250,7 +1278,7 @@ TEST_CASE("Test fixed-length scalar array") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Not an array type") {
+  SUBCASE("Not an array type") {
     PropertyTablePropertyView<uint32_t> uint32Invalid =
         view.getPropertyView<uint32_t>("TestClassProperty");
     REQUIRE(
@@ -1258,7 +1286,7 @@ TEST_CASE("Test fixed-length scalar array") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Incorrectly normalized") {
+  SUBCASE("Incorrectly normalized") {
     PropertyTablePropertyView<PropertyArrayView<uint32_t>, true>
         normalizedInvalid =
             view.getPropertyView<PropertyArrayView<uint32_t>, true>(
@@ -1268,7 +1296,7 @@ TEST_CASE("Test fixed-length scalar array") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Buffer size is not a multiple of type size") {
+  SUBCASE("Buffer size is not a multiple of type size") {
     model.bufferViews[valueBufferViewIndex].byteLength = 13;
     PropertyTablePropertyView<PropertyArrayView<uint32_t>> arrayProperty =
         view.getPropertyView<PropertyArrayView<uint32_t>>("TestClassProperty");
@@ -1278,7 +1306,7 @@ TEST_CASE("Test fixed-length scalar array") {
             ErrorBufferViewSizeNotDivisibleByTypeSize);
   }
 
-  SECTION("Negative count") {
+  SUBCASE("Negative count") {
     testClassProperty.count = -1;
     PropertyTablePropertyView<PropertyArrayView<uint32_t>> arrayProperty =
         view.getPropertyView<PropertyArrayView<uint32_t>>("TestClassProperty");
@@ -1287,7 +1315,7 @@ TEST_CASE("Test fixed-length scalar array") {
                                       ErrorArrayCountAndOffsetBufferDontExist);
   }
 
-  SECTION("Value buffer doesn't fit into property table count") {
+  SUBCASE("Value buffer doesn't fit into property table count") {
     testClassProperty.count = 55;
     PropertyTablePropertyView<PropertyArrayView<uint32_t>> arrayProperty =
         view.getPropertyView<PropertyArrayView<uint32_t>>("TestClassProperty");
@@ -1340,7 +1368,7 @@ TEST_CASE("Test fixed-length scalar array (normalized)") {
   REQUIRE(classProperty->count == 3);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access the right type") {
+  SUBCASE("Access the right type") {
     PropertyTablePropertyView<PropertyArrayView<uint32_t>, true> arrayProperty =
         view.getPropertyView<PropertyArrayView<uint32_t>, true>(
             "TestClassProperty");
@@ -1358,7 +1386,7 @@ TEST_CASE("Test fixed-length scalar array (normalized)") {
     }
   }
 
-  SECTION("Wrong type") {
+  SUBCASE("Wrong type") {
     PropertyTablePropertyView<PropertyArrayView<glm::uvec2>, true>
         uvec2ArrayInvalid =
             view.getPropertyView<PropertyArrayView<glm::uvec2>, true>(
@@ -1368,7 +1396,7 @@ TEST_CASE("Test fixed-length scalar array (normalized)") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Wrong component type") {
+  SUBCASE("Wrong component type") {
     PropertyTablePropertyView<PropertyArrayView<int32_t>, true>
         int32ArrayInvalid =
             view.getPropertyView<PropertyArrayView<int32_t>, true>(
@@ -1378,7 +1406,7 @@ TEST_CASE("Test fixed-length scalar array (normalized)") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Not an array type") {
+  SUBCASE("Not an array type") {
     PropertyTablePropertyView<uint32_t, true> uint32Invalid =
         view.getPropertyView<uint32_t, true>("TestClassProperty");
     REQUIRE(
@@ -1386,7 +1414,7 @@ TEST_CASE("Test fixed-length scalar array (normalized)") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Incorrectly non-normalized") {
+  SUBCASE("Incorrectly non-normalized") {
     PropertyTablePropertyView<PropertyArrayView<uint32_t>>
         nonNormalizedInvalid =
             view.getPropertyView<PropertyArrayView<uint32_t>>(
@@ -1419,10 +1447,10 @@ TEST_CASE("Test variable-length scalar array") {
   uint64_t* offsetValue = reinterpret_cast<uint64_t*>(offsets.data());
   for (size_t i = 0; i < expected.size(); ++i) {
     std::memcpy(
-        values.data() + offsetValue[i],
+        values.data() + offsetValue[i] * sizeof(uint16_t),
         expected[i].data(),
         expected[i].size() * sizeof(uint16_t));
-    offsetValue[i + 1] = offsetValue[i] + expected[i].size() * sizeof(uint16_t);
+    offsetValue[i + 1] = offsetValue[i] + expected[i].size();
   }
 
   addBufferToModel(model, values);
@@ -1468,7 +1496,7 @@ TEST_CASE("Test variable-length scalar array") {
   REQUIRE(!classProperty->count);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access the correct type") {
+  SUBCASE("Access the correct type") {
     PropertyTablePropertyView<PropertyArrayView<uint16_t>> property =
         view.getPropertyView<PropertyArrayView<uint16_t>>("TestClassProperty");
     REQUIRE(property.status() == PropertyTablePropertyViewStatus::Valid);
@@ -1490,7 +1518,7 @@ TEST_CASE("Test variable-length scalar array") {
     }
   }
 
-  SECTION("Incorrectly normalized") {
+  SUBCASE("Incorrectly normalized") {
     PropertyTablePropertyView<PropertyArrayView<uint16_t>, true> property =
         view.getPropertyView<PropertyArrayView<uint16_t>, true>(
             "TestClassProperty");
@@ -1499,7 +1527,7 @@ TEST_CASE("Test variable-length scalar array") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Wrong offset type") {
+  SUBCASE("Wrong offset type") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT8;
     PropertyTablePropertyView<PropertyArrayView<uint16_t>> arrayProperty =
@@ -1535,7 +1563,7 @@ TEST_CASE("Test variable-length scalar array") {
         PropertyTablePropertyViewStatus::ErrorInvalidArrayOffsetType);
   }
 
-  SECTION("Offset values are not sorted ascending") {
+  SUBCASE("Offset values are not sorted ascending") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT64;
     uint64_t* offset = reinterpret_cast<uint64_t*>(
@@ -1548,7 +1576,7 @@ TEST_CASE("Test variable-length scalar array") {
         PropertyTablePropertyViewStatus::ErrorArrayOffsetsNotSorted);
   }
 
-  SECTION("Offset value points outside of value buffer") {
+  SUBCASE("Offset value points outside of value buffer") {
     uint64_t* offset = reinterpret_cast<uint64_t*>(
         model.buffers[offsetBufferIndex].cesium.data.data());
     offset[propertyTable.count] =
@@ -1560,7 +1588,7 @@ TEST_CASE("Test variable-length scalar array") {
         PropertyTablePropertyViewStatus::ErrorArrayOffsetOutOfBounds);
   }
 
-  SECTION("Count and offset buffer are both present") {
+  SUBCASE("Count and offset buffer are both present") {
     testClassProperty.count = 3;
     PropertyTablePropertyView<PropertyArrayView<uint16_t>> property =
         view.getPropertyView<PropertyArrayView<uint16_t>>("TestClassProperty");
@@ -1592,10 +1620,10 @@ TEST_CASE("Test variable-length scalar array (normalized)") {
   uint64_t* offsetValue = reinterpret_cast<uint64_t*>(offsets.data());
   for (size_t i = 0; i < expected.size(); ++i) {
     std::memcpy(
-        values.data() + offsetValue[i],
+        values.data() + offsetValue[i] * sizeof(uint16_t),
         expected[i].data(),
         expected[i].size() * sizeof(uint16_t));
-    offsetValue[i + 1] = offsetValue[i] + expected[i].size() * sizeof(uint16_t);
+    offsetValue[i + 1] = offsetValue[i] + expected[i].size();
   }
 
   addBufferToModel(model, values);
@@ -1640,7 +1668,7 @@ TEST_CASE("Test variable-length scalar array (normalized)") {
   REQUIRE(!classProperty->count);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access the correct type") {
+  SUBCASE("Access the correct type") {
     PropertyTablePropertyView<PropertyArrayView<uint16_t>, true> property =
         view.getPropertyView<PropertyArrayView<uint16_t>, true>(
             "TestClassProperty");
@@ -1662,7 +1690,7 @@ TEST_CASE("Test variable-length scalar array (normalized)") {
     }
   }
 
-  SECTION("Incorrectly non-normalized") {
+  SUBCASE("Incorrectly non-normalized") {
     PropertyTablePropertyView<PropertyArrayView<uint16_t>> property =
         view.getPropertyView<PropertyArrayView<uint16_t>>("TestClassProperty");
     REQUIRE(
@@ -1719,7 +1747,7 @@ TEST_CASE("Test fixed-length vecN array") {
   REQUIRE(classProperty->count == 2);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access the right type") {
+  SUBCASE("Access the right type") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> arrayProperty =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
             "TestClassProperty");
@@ -1737,7 +1765,7 @@ TEST_CASE("Test fixed-length vecN array") {
     }
   }
 
-  SECTION("Wrong type") {
+  SUBCASE("Wrong type") {
     PropertyTablePropertyView<PropertyArrayView<int32_t>> int32ArrayInvalid =
         view.getPropertyView<PropertyArrayView<int32_t>>("TestClassProperty");
     REQUIRE(
@@ -1752,7 +1780,7 @@ TEST_CASE("Test fixed-length vecN array") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Wrong component type") {
+  SUBCASE("Wrong component type") {
     PropertyTablePropertyView<PropertyArrayView<glm::uvec3>> uvec3ArrayInvalid =
         view.getPropertyView<PropertyArrayView<glm::uvec3>>(
             "TestClassProperty");
@@ -1761,7 +1789,7 @@ TEST_CASE("Test fixed-length vecN array") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Not an array type") {
+  SUBCASE("Not an array type") {
     PropertyTablePropertyView<glm::ivec3> ivec3Invalid =
         view.getPropertyView<glm::ivec3>("TestClassProperty");
     REQUIRE(
@@ -1769,7 +1797,7 @@ TEST_CASE("Test fixed-length vecN array") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Incorrect normalization") {
+  SUBCASE("Incorrect normalization") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>, true>
         normalizedInvalid =
             view.getPropertyView<PropertyArrayView<glm::ivec3>, true>(
@@ -1779,7 +1807,7 @@ TEST_CASE("Test fixed-length vecN array") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Buffer size is not a multiple of type size") {
+  SUBCASE("Buffer size is not a multiple of type size") {
     model.bufferViews[valueBufferViewIndex].byteLength = 13;
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> arrayProperty =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
@@ -1790,7 +1818,7 @@ TEST_CASE("Test fixed-length vecN array") {
             ErrorBufferViewSizeNotDivisibleByTypeSize);
   }
 
-  SECTION("Negative count") {
+  SUBCASE("Negative count") {
     testClassProperty.count = -1;
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> arrayProperty =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
@@ -1800,7 +1828,7 @@ TEST_CASE("Test fixed-length vecN array") {
                                       ErrorArrayCountAndOffsetBufferDontExist);
   }
 
-  SECTION("Value buffer doesn't fit into property table count") {
+  SUBCASE("Value buffer doesn't fit into property table count") {
     testClassProperty.count = 55;
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> arrayProperty =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
@@ -1860,7 +1888,7 @@ TEST_CASE("Test fixed-length vecN array (normalized)") {
   REQUIRE(classProperty->count == 2);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access the right type") {
+  SUBCASE("Access the right type") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>, true>
         arrayProperty =
             view.getPropertyView<PropertyArrayView<glm::ivec3>, true>(
@@ -1879,7 +1907,7 @@ TEST_CASE("Test fixed-length vecN array (normalized)") {
     }
   }
 
-  SECTION("Wrong type") {
+  SUBCASE("Wrong type") {
     PropertyTablePropertyView<PropertyArrayView<int32_t>, true>
         int32ArrayInvalid =
             view.getPropertyView<PropertyArrayView<int32_t>, true>(
@@ -1897,7 +1925,7 @@ TEST_CASE("Test fixed-length vecN array (normalized)") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Wrong component type") {
+  SUBCASE("Wrong component type") {
     PropertyTablePropertyView<PropertyArrayView<glm::uvec3>, true>
         uvec3ArrayInvalid =
             view.getPropertyView<PropertyArrayView<glm::uvec3>, true>(
@@ -1907,7 +1935,7 @@ TEST_CASE("Test fixed-length vecN array (normalized)") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Not an array type") {
+  SUBCASE("Not an array type") {
     PropertyTablePropertyView<glm::ivec3, true> ivec3Invalid =
         view.getPropertyView<glm::ivec3, true>("TestClassProperty");
     REQUIRE(
@@ -1915,7 +1943,7 @@ TEST_CASE("Test fixed-length vecN array (normalized)") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Incorrect non-normalization") {
+  SUBCASE("Incorrect non-normalization") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>>
         nonNormalizedInvalid =
             view.getPropertyView<PropertyArrayView<glm::ivec3>>(
@@ -1948,11 +1976,10 @@ TEST_CASE("Test variable-length vecN array") {
   uint64_t* offsetValue = reinterpret_cast<uint64_t*>(offsets.data());
   for (size_t i = 0; i < expected.size(); ++i) {
     std::memcpy(
-        values.data() + offsetValue[i],
+        values.data() + offsetValue[i] * sizeof(glm::ivec3),
         expected[i].data(),
         expected[i].size() * sizeof(glm::ivec3));
-    offsetValue[i + 1] =
-        offsetValue[i] + expected[i].size() * sizeof(glm::ivec3);
+    offsetValue[i + 1] = offsetValue[i] + expected[i].size();
   }
 
   addBufferToModel(model, values);
@@ -1998,7 +2025,7 @@ TEST_CASE("Test variable-length vecN array") {
   REQUIRE(!classProperty->count);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access the correct type") {
+  SUBCASE("Access the correct type") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> property =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
             "TestClassProperty");
@@ -2018,7 +2045,7 @@ TEST_CASE("Test variable-length vecN array") {
     }
   }
 
-  SECTION("Incorrectly normalized") {
+  SUBCASE("Incorrectly normalized") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>, true> property =
         view.getPropertyView<PropertyArrayView<glm::ivec3>, true>(
             "TestClassProperty");
@@ -2027,7 +2054,7 @@ TEST_CASE("Test variable-length vecN array") {
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Wrong offset type") {
+  SUBCASE("Wrong offset type") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT8;
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> arrayProperty =
@@ -2064,7 +2091,7 @@ TEST_CASE("Test variable-length vecN array") {
         PropertyTablePropertyViewStatus::ErrorInvalidArrayOffsetType);
   }
 
-  SECTION("Offset values are not sorted ascending") {
+  SUBCASE("Offset values are not sorted ascending") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT64;
     uint64_t* offset = reinterpret_cast<uint64_t*>(
@@ -2078,7 +2105,7 @@ TEST_CASE("Test variable-length vecN array") {
         PropertyTablePropertyViewStatus::ErrorArrayOffsetsNotSorted);
   }
 
-  SECTION("Offset value points outside of value buffer") {
+  SUBCASE("Offset value points outside of value buffer") {
     uint64_t* offset = reinterpret_cast<uint64_t*>(
         model.buffers[offsetBufferIndex].cesium.data.data());
     offset[propertyTable.count] =
@@ -2091,7 +2118,7 @@ TEST_CASE("Test variable-length vecN array") {
         PropertyTablePropertyViewStatus::ErrorArrayOffsetOutOfBounds);
   }
 
-  SECTION("Count and offset buffer are both present") {
+  SUBCASE("Count and offset buffer are both present") {
     testClassProperty.count = 3;
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> property =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
@@ -2124,11 +2151,10 @@ TEST_CASE("Test variable-length vecN array (normalized)") {
   uint64_t* offsetValue = reinterpret_cast<uint64_t*>(offsets.data());
   for (size_t i = 0; i < expected.size(); ++i) {
     std::memcpy(
-        values.data() + offsetValue[i],
+        values.data() + offsetValue[i] * sizeof(glm::ivec3),
         expected[i].data(),
         expected[i].size() * sizeof(glm::ivec3));
-    offsetValue[i + 1] =
-        offsetValue[i] + expected[i].size() * sizeof(glm::ivec3);
+    offsetValue[i + 1] = offsetValue[i] + expected[i].size();
   }
 
   addBufferToModel(model, values);
@@ -2173,7 +2199,7 @@ TEST_CASE("Test variable-length vecN array (normalized)") {
   REQUIRE(!classProperty->count);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access the correct type") {
+  SUBCASE("Access the correct type") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>, true> property =
         view.getPropertyView<PropertyArrayView<glm::ivec3>, true>(
             "TestClassProperty");
@@ -2193,7 +2219,7 @@ TEST_CASE("Test variable-length vecN array (normalized)") {
     }
   }
 
-  SECTION("Incorrectly non-normalized") {
+  SUBCASE("Incorrectly non-normalized") {
     PropertyTablePropertyView<PropertyArrayView<glm::ivec3>> property =
         view.getPropertyView<PropertyArrayView<glm::ivec3>>(
             "TestClassProperty");
@@ -2206,23 +2232,23 @@ TEST_CASE("Test variable-length vecN array (normalized)") {
 TEST_CASE("Test fixed-length matN array") {
   Model model;
   // clang-format off
-  std::vector<glm::i32mat2x2> values = {
-      glm::i32mat2x2(
+  std::vector<glm::imat2x2> values = {
+      glm::imat2x2(
         12, 34,
         -30, 20),
-      glm::i32mat2x2(
+      glm::imat2x2(
         -2, -2,
         0, 1),
-      glm::i32mat2x2(
+      glm::imat2x2(
         1, 2,
         8, 5),
-      glm::i32mat2x2(
+      glm::imat2x2(
         -100, 3,
         84, 6),
-      glm::i32mat2x2(
+      glm::imat2x2(
         2, 12,
         -2, -2),
-      glm::i32mat2x2(
+      glm::imat2x2(
         40, 61,
         7, -3),
   };
@@ -2265,21 +2291,21 @@ TEST_CASE("Test fixed-length matN array") {
   REQUIRE(classProperty->count == 2);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access the right type") {
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> arrayProperty =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+  SUBCASE("Access the right type") {
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> arrayProperty =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(arrayProperty.status() == PropertyTablePropertyViewStatus::Valid);
 
     for (int64_t i = 0; i < arrayProperty.size(); ++i) {
-      PropertyArrayView<glm::i32mat2x2> member = arrayProperty.getRaw(i);
+      PropertyArrayView<glm::imat2x2> member = arrayProperty.getRaw(i);
       for (int64_t j = 0; j < member.size(); ++j) {
         REQUIRE(member[j] == values[static_cast<size_t>(i * 2 + j)]);
       }
     }
   }
 
-  SECTION("Wrong type") {
+  SUBCASE("Wrong type") {
     PropertyTablePropertyView<PropertyArrayView<int32_t>> int32ArrayInvalid =
         view.getPropertyView<PropertyArrayView<int32_t>>("TestClassProperty");
     REQUIRE(
@@ -2294,7 +2320,7 @@ TEST_CASE("Test fixed-length matN array") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Wrong component type") {
+  SUBCASE("Wrong component type") {
     PropertyTablePropertyView<PropertyArrayView<glm::umat2x2>>
         umat2x2ArrayInvalid =
             view.getPropertyView<PropertyArrayView<glm::umat2x2>>(
@@ -2304,28 +2330,28 @@ TEST_CASE("Test fixed-length matN array") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Not an array type") {
-    PropertyTablePropertyView<glm::i32mat2x2> ivec3Invalid =
-        view.getPropertyView<glm::i32mat2x2>("TestClassProperty");
+  SUBCASE("Not an array type") {
+    PropertyTablePropertyView<glm::imat2x2> ivec3Invalid =
+        view.getPropertyView<glm::imat2x2>("TestClassProperty");
     REQUIRE(
         ivec3Invalid.status() ==
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Incorrect normalization") {
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>, true>
+  SUBCASE("Incorrect normalization") {
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>, true>
         normalizedInvalid =
-            view.getPropertyView<PropertyArrayView<glm::i32mat2x2>, true>(
+            view.getPropertyView<PropertyArrayView<glm::imat2x2>, true>(
                 "TestClassProperty");
     REQUIRE(
         normalizedInvalid.status() ==
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Buffer size is not a multiple of type size") {
+  SUBCASE("Buffer size is not a multiple of type size") {
     model.bufferViews[valueBufferViewIndex].byteLength = 13;
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> arrayProperty =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> arrayProperty =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(
         arrayProperty.status() ==
@@ -2333,20 +2359,20 @@ TEST_CASE("Test fixed-length matN array") {
             ErrorBufferViewSizeNotDivisibleByTypeSize);
   }
 
-  SECTION("Negative count") {
+  SUBCASE("Negative count") {
     testClassProperty.count = -1;
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> arrayProperty =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> arrayProperty =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(
         arrayProperty.status() == PropertyTablePropertyViewStatus::
                                       ErrorArrayCountAndOffsetBufferDontExist);
   }
 
-  SECTION("Value buffer doesn't fit into property table count") {
+  SUBCASE("Value buffer doesn't fit into property table count") {
     testClassProperty.count = 55;
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> arrayProperty =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> arrayProperty =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(
         arrayProperty.status() ==
@@ -2358,23 +2384,23 @@ TEST_CASE("Test fixed-length matN array") {
 TEST_CASE("Test fixed-length matN array (normalized)") {
   Model model;
   // clang-format off
-  std::vector<glm::i32mat2x2> values = {
-      glm::i32mat2x2(
+  std::vector<glm::imat2x2> values = {
+      glm::imat2x2(
         12, 34,
         -30, 20),
-      glm::i32mat2x2(
+      glm::imat2x2(
         -2, -2,
         0, 1),
-      glm::i32mat2x2(
+      glm::imat2x2(
         1, 2,
         8, 5),
-      glm::i32mat2x2(
+      glm::imat2x2(
         -100, 3,
         84, 6),
-      glm::i32mat2x2(
+      glm::imat2x2(
         2, 12,
         -2, -2),
-      glm::i32mat2x2(
+      glm::imat2x2(
         40, 61,
         7, -3),
   };
@@ -2417,15 +2443,15 @@ TEST_CASE("Test fixed-length matN array (normalized)") {
   REQUIRE(classProperty->count == 2);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access the right type") {
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>, true>
+  SUBCASE("Access the right type") {
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>, true>
         arrayProperty =
-            view.getPropertyView<PropertyArrayView<glm::i32mat2x2>, true>(
+            view.getPropertyView<PropertyArrayView<glm::imat2x2>, true>(
                 "TestClassProperty");
     REQUIRE(arrayProperty.status() == PropertyTablePropertyViewStatus::Valid);
 
     for (int64_t i = 0; i < arrayProperty.size(); ++i) {
-      PropertyArrayView<glm::i32mat2x2> array = arrayProperty.getRaw(i);
+      PropertyArrayView<glm::imat2x2> array = arrayProperty.getRaw(i);
       auto maybeArray = arrayProperty.get(i);
       REQUIRE(maybeArray);
 
@@ -2436,7 +2462,7 @@ TEST_CASE("Test fixed-length matN array (normalized)") {
     }
   }
 
-  SECTION("Wrong type") {
+  SUBCASE("Wrong type") {
     PropertyTablePropertyView<PropertyArrayView<int32_t>, true>
         int32ArrayInvalid =
             view.getPropertyView<PropertyArrayView<int32_t>, true>(
@@ -2454,7 +2480,7 @@ TEST_CASE("Test fixed-length matN array (normalized)") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Wrong component type") {
+  SUBCASE("Wrong component type") {
     PropertyTablePropertyView<PropertyArrayView<glm::umat2x2>, true>
         umat2x2ArrayInvalid =
             view.getPropertyView<PropertyArrayView<glm::umat2x2>, true>(
@@ -2464,18 +2490,18 @@ TEST_CASE("Test fixed-length matN array (normalized)") {
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Not an array type") {
-    PropertyTablePropertyView<glm::i32mat2x2, true> ivec3Invalid =
-        view.getPropertyView<glm::i32mat2x2, true>("TestClassProperty");
+  SUBCASE("Not an array type") {
+    PropertyTablePropertyView<glm::imat2x2, true> ivec3Invalid =
+        view.getPropertyView<glm::imat2x2, true>("TestClassProperty");
     REQUIRE(
         ivec3Invalid.status() ==
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Incorrect non-normalization") {
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>>
+  SUBCASE("Incorrect non-normalization") {
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>>
         nonNormalizedInvalid =
-            view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+            view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
                 "TestClassProperty");
     REQUIRE(
         nonNormalizedInvalid.status() ==
@@ -2486,50 +2512,48 @@ TEST_CASE("Test fixed-length matN array (normalized)") {
 TEST_CASE("Test variable-length matN array") {
   Model model;
   // clang-format off
-    std::vector<glm::i32mat2x2> data0{
-        glm::i32mat2x2(
+    std::vector<glm::imat2x2> data0{
+        glm::imat2x2(
           3, -2,
           1, 0),
-        glm::i32mat2x2(
+        glm::imat2x2(
           40, 3,
           8, -9)
     };
-    std::vector<glm::i32mat2x2> data1{
-        glm::i32mat2x2(
+    std::vector<glm::imat2x2> data1{
+        glm::imat2x2(
           1, 10,
           7, 8),
     };
-    std::vector<glm::i32mat2x2> data2{
-        glm::i32mat2x2(
+    std::vector<glm::imat2x2> data2{
+        glm::imat2x2(
           18, 0,
           1, 17),
-        glm::i32mat2x2(
+        glm::imat2x2(
           -4, -2,
           -9, 1),
-        glm::i32mat2x2(
+        glm::imat2x2(
           1, 8,
           -99, 3),
     };
   // clang-format on
 
-  std::vector<std::vector<glm::i32mat2x2>>
-      expected{data0, {}, data1, data2, {}};
+  std::vector<std::vector<glm::imat2x2>> expected{data0, {}, data1, data2, {}};
 
   size_t numOfElements = 0;
   for (const auto& expectedMember : expected) {
     numOfElements += expectedMember.size();
   }
 
-  std::vector<std::byte> values(numOfElements * sizeof(glm::i32mat2x2));
+  std::vector<std::byte> values(numOfElements * sizeof(glm::imat2x2));
   std::vector<std::byte> offsets((expected.size() + 1) * sizeof(uint64_t));
   uint64_t* offsetValue = reinterpret_cast<uint64_t*>(offsets.data());
   for (size_t i = 0; i < expected.size(); ++i) {
     std::memcpy(
-        values.data() + offsetValue[i],
+        values.data() + offsetValue[i] * sizeof(glm::imat2x2),
         expected[i].data(),
-        expected[i].size() * sizeof(glm::i32mat2x2));
-    offsetValue[i + 1] =
-        offsetValue[i] + expected[i].size() * sizeof(glm::i32mat2x2);
+        expected[i].size() * sizeof(glm::imat2x2));
+    offsetValue[i + 1] = offsetValue[i] + expected[i].size();
   }
 
   addBufferToModel(model, values);
@@ -2575,13 +2599,13 @@ TEST_CASE("Test variable-length matN array") {
   REQUIRE(!classProperty->count);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access the correct type") {
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> property =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+  SUBCASE("Access the correct type") {
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> property =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(property.status() == PropertyTablePropertyViewStatus::Valid);
     for (size_t i = 0; i < expected.size(); ++i) {
-      PropertyArrayView<glm::i32mat2x2> array =
+      PropertyArrayView<glm::imat2x2> array =
           property.getRaw(static_cast<int64_t>(i));
       REQUIRE(array.size() == static_cast<int64_t>(expected[i].size()));
 
@@ -2595,21 +2619,20 @@ TEST_CASE("Test variable-length matN array") {
     }
   }
 
-  SECTION("Incorrectly normalized") {
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>, true>
-        property =
-            view.getPropertyView<PropertyArrayView<glm::i32mat2x2>, true>(
-                "TestClassProperty");
+  SUBCASE("Incorrectly normalized") {
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>, true> property =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>, true>(
+            "TestClassProperty");
     REQUIRE(
         property.status() ==
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Wrong offset type") {
+  SUBCASE("Wrong offset type") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT8;
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> arrayProperty =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> arrayProperty =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(
         arrayProperty.status() ==
@@ -2618,7 +2641,7 @@ TEST_CASE("Test variable-length matN array") {
 
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT16;
-    arrayProperty = view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    arrayProperty = view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
         "TestClassProperty");
     REQUIRE(
         arrayProperty.status() ==
@@ -2626,7 +2649,7 @@ TEST_CASE("Test variable-length matN array") {
             ErrorBufferViewSizeDoesNotMatchPropertyTableCount);
 
     propertyTableProperty.arrayOffsetType = "NONSENSE";
-    arrayProperty = view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    arrayProperty = view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
         "TestClassProperty");
     REQUIRE(
         arrayProperty.status() ==
@@ -2635,44 +2658,44 @@ TEST_CASE("Test variable-length matN array") {
     propertyTableProperty.arrayOffsetType = "";
     propertyTableProperty.stringOffsetType =
         PropertyTableProperty::StringOffsetType::UINT64;
-    arrayProperty = view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    arrayProperty = view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
         "TestClassProperty");
     REQUIRE(
         arrayProperty.status() ==
         PropertyTablePropertyViewStatus::ErrorInvalidArrayOffsetType);
   }
 
-  SECTION("Offset values are not sorted ascending") {
+  SUBCASE("Offset values are not sorted ascending") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT64;
     uint64_t* offset = reinterpret_cast<uint64_t*>(
         model.buffers[offsetBufferIndex].cesium.data.data());
     offset[propertyTable.count] = 0;
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> arrayProperty =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> arrayProperty =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(
         arrayProperty.status() ==
         PropertyTablePropertyViewStatus::ErrorArrayOffsetsNotSorted);
   }
 
-  SECTION("Offset value points outside of value buffer") {
+  SUBCASE("Offset value points outside of value buffer") {
     uint64_t* offset = reinterpret_cast<uint64_t*>(
         model.buffers[offsetBufferIndex].cesium.data.data());
     offset[propertyTable.count] =
         static_cast<uint32_t>(model.buffers[valueBufferIndex].byteLength + 4);
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> arrayProperty =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> arrayProperty =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(
         arrayProperty.status() ==
         PropertyTablePropertyViewStatus::ErrorArrayOffsetOutOfBounds);
   }
 
-  SECTION("Count and offset buffer are both present") {
+  SUBCASE("Count and offset buffer are both present") {
     testClassProperty.count = 3;
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> property =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> property =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(
         property.status() ==
@@ -2683,50 +2706,48 @@ TEST_CASE("Test variable-length matN array") {
 TEST_CASE("Test variable-length matN array (normalized)") {
   Model model;
   // clang-format off
-    std::vector<glm::i32mat2x2> data0{
-        glm::i32mat2x2(
+    std::vector<glm::imat2x2> data0{
+        glm::imat2x2(
           3, -2,
           1, 0),
-        glm::i32mat2x2(
+        glm::imat2x2(
           40, 3,
           8, -9)
     };
-    std::vector<glm::i32mat2x2> data1{
-        glm::i32mat2x2(
+    std::vector<glm::imat2x2> data1{
+        glm::imat2x2(
           1, 10,
           7, 8),
     };
-    std::vector<glm::i32mat2x2> data2{
-        glm::i32mat2x2(
+    std::vector<glm::imat2x2> data2{
+        glm::imat2x2(
           18, 0,
           1, 17),
-        glm::i32mat2x2(
+        glm::imat2x2(
           -4, -2,
           -9, 1),
-        glm::i32mat2x2(
+        glm::imat2x2(
           1, 8,
           -99, 3),
     };
   // clang-format on
 
-  std::vector<std::vector<glm::i32mat2x2>>
-      expected{data0, {}, data1, data2, {}};
+  std::vector<std::vector<glm::imat2x2>> expected{data0, {}, data1, data2, {}};
 
   size_t numOfElements = 0;
   for (const auto& expectedMember : expected) {
     numOfElements += expectedMember.size();
   }
 
-  std::vector<std::byte> values(numOfElements * sizeof(glm::i32mat2x2));
+  std::vector<std::byte> values(numOfElements * sizeof(glm::imat2x2));
   std::vector<std::byte> offsets((expected.size() + 1) * sizeof(uint64_t));
   uint64_t* offsetValue = reinterpret_cast<uint64_t*>(offsets.data());
   for (size_t i = 0; i < expected.size(); ++i) {
     std::memcpy(
-        values.data() + offsetValue[i],
+        values.data() + offsetValue[i] * sizeof(glm::imat2x2),
         expected[i].data(),
-        expected[i].size() * sizeof(glm::i32mat2x2));
-    offsetValue[i + 1] =
-        offsetValue[i] + expected[i].size() * sizeof(glm::i32mat2x2);
+        expected[i].size() * sizeof(glm::imat2x2));
+    offsetValue[i + 1] = offsetValue[i] + expected[i].size();
   }
 
   addBufferToModel(model, values);
@@ -2771,14 +2792,13 @@ TEST_CASE("Test variable-length matN array (normalized)") {
   REQUIRE(!classProperty->count);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access the correct type") {
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>, true>
-        property =
-            view.getPropertyView<PropertyArrayView<glm::i32mat2x2>, true>(
-                "TestClassProperty");
+  SUBCASE("Access the correct type") {
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>, true> property =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>, true>(
+            "TestClassProperty");
     REQUIRE(property.status() == PropertyTablePropertyViewStatus::Valid);
     for (size_t i = 0; i < expected.size(); ++i) {
-      PropertyArrayView<glm::i32mat2x2> array =
+      PropertyArrayView<glm::imat2x2> array =
           property.getRaw(static_cast<int64_t>(i));
       REQUIRE(array.size() == static_cast<int64_t>(expected[i].size()));
 
@@ -2792,9 +2812,9 @@ TEST_CASE("Test variable-length matN array (normalized)") {
     }
   }
 
-  SECTION("Incorrectly non-normalized") {
-    PropertyTablePropertyView<PropertyArrayView<glm::i32mat2x2>> property =
-        view.getPropertyView<PropertyArrayView<glm::i32mat2x2>>(
+  SUBCASE("Incorrectly non-normalized") {
+    PropertyTablePropertyView<PropertyArrayView<glm::imat2x2>> property =
+        view.getPropertyView<PropertyArrayView<glm::imat2x2>>(
             "TestClassProperty");
     REQUIRE(
         property.status() ==
@@ -2863,7 +2883,7 @@ TEST_CASE("Test fixed-length boolean array") {
   REQUIRE(classProperty->array);
   REQUIRE(classProperty->count == 3);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<PropertyArrayView<bool>> boolArrayProperty =
         view.getPropertyView<PropertyArrayView<bool>>("TestClassProperty");
     REQUIRE(
@@ -2882,7 +2902,7 @@ TEST_CASE("Test fixed-length boolean array") {
     }
   }
 
-  SECTION("Wrong type") {
+  SUBCASE("Wrong type") {
     PropertyTablePropertyView<PropertyArrayView<uint8_t>> uint8ArrayInvalid =
         view.getPropertyView<PropertyArrayView<uint8_t>>("TestClassProperty");
     REQUIRE(
@@ -2890,7 +2910,7 @@ TEST_CASE("Test fixed-length boolean array") {
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("View is not array type") {
+  SUBCASE("View is not array type") {
     PropertyTablePropertyView<bool> boolInvalid =
         view.getPropertyView<bool>("TestClassProperty");
     REQUIRE(
@@ -2898,7 +2918,7 @@ TEST_CASE("Test fixed-length boolean array") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Value buffer doesn't have enough required bytes") {
+  SUBCASE("Value buffer doesn't have enough required bytes") {
     testClassProperty.count = 11;
     PropertyTablePropertyView<PropertyArrayView<bool>> boolArrayProperty =
         view.getPropertyView<PropertyArrayView<bool>>("TestClassProperty");
@@ -2908,7 +2928,7 @@ TEST_CASE("Test fixed-length boolean array") {
             ErrorBufferViewSizeDoesNotMatchPropertyTableCount);
   }
 
-  SECTION("Count is negative") {
+  SUBCASE("Count is negative") {
     testClassProperty.count = -1;
     PropertyTablePropertyView<PropertyArrayView<bool>> boolArrayProperty =
         view.getPropertyView<PropertyArrayView<bool>>("TestClassProperty");
@@ -2994,7 +3014,7 @@ TEST_CASE("Test variable-length boolean array") {
   REQUIRE(classProperty->array);
   REQUIRE(!classProperty->count);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<PropertyArrayView<bool>> boolArrayProperty =
         view.getPropertyView<PropertyArrayView<bool>>("TestClassProperty");
     REQUIRE(
@@ -3014,7 +3034,7 @@ TEST_CASE("Test variable-length boolean array") {
     }
   }
 
-  SECTION("Wrong offset type") {
+  SUBCASE("Wrong offset type") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT8;
     PropertyTablePropertyView<PropertyArrayView<bool>> arrayProperty =
@@ -3050,7 +3070,7 @@ TEST_CASE("Test variable-length boolean array") {
         PropertyTablePropertyViewStatus::ErrorInvalidArrayOffsetType);
   }
 
-  SECTION("Offset values are not sorted ascending") {
+  SUBCASE("Offset values are not sorted ascending") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT64;
     uint64_t* offset = reinterpret_cast<uint64_t*>(
@@ -3063,7 +3083,7 @@ TEST_CASE("Test variable-length boolean array") {
         PropertyTablePropertyViewStatus::ErrorArrayOffsetsNotSorted);
   }
 
-  SECTION("Offset value points outside of value buffer") {
+  SUBCASE("Offset value points outside of value buffer") {
     uint64_t* offset = reinterpret_cast<uint64_t*>(
         model.buffers[offsetBufferIndex].cesium.data.data());
     offset[propertyTable.count] = static_cast<uint32_t>(
@@ -3075,7 +3095,7 @@ TEST_CASE("Test variable-length boolean array") {
         PropertyTablePropertyViewStatus::ErrorArrayOffsetOutOfBounds);
   }
 
-  SECTION("Count and offset buffer both present") {
+  SUBCASE("Count and offset buffer both present") {
     testClassProperty.count = 3;
     PropertyTablePropertyView<PropertyArrayView<bool>> boolArrayProperty =
         view.getPropertyView<PropertyArrayView<bool>>("TestClassProperty");
@@ -3154,7 +3174,7 @@ TEST_CASE("Test fixed-length arrays of strings") {
   REQUIRE(classProperty->array);
   REQUIRE(classProperty->count == 2);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
         stringProperty =
             view.getPropertyView<PropertyArrayView<std::string_view>>(
@@ -3189,7 +3209,7 @@ TEST_CASE("Test fixed-length arrays of strings") {
     }
   }
 
-  SECTION("Array type mismatch") {
+  SUBCASE("Array type mismatch") {
     PropertyTablePropertyView<std::string_view> stringProperty =
         view.getPropertyView<std::string_view>("TestClassProperty");
     REQUIRE(
@@ -3197,7 +3217,7 @@ TEST_CASE("Test fixed-length arrays of strings") {
         PropertyTablePropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Count is negative") {
+  SUBCASE("Count is negative") {
     testClassProperty.count = -1;
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
         stringProperty =
@@ -3208,7 +3228,7 @@ TEST_CASE("Test fixed-length arrays of strings") {
                                        ErrorArrayCountAndOffsetBufferDontExist);
   }
 
-  SECTION("Offset type is unknown") {
+  SUBCASE("Offset type is unknown") {
     propertyTableProperty.stringOffsetType = "NONSENSE";
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
         stringProperty =
@@ -3228,7 +3248,7 @@ TEST_CASE("Test fixed-length arrays of strings") {
         PropertyTablePropertyViewStatus::ErrorInvalidStringOffsetType);
   }
 
-  SECTION("String offsets don't exist") {
+  SUBCASE("String offsets don't exist") {
     propertyTableProperty.stringOffsets = -1;
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
         stringProperty =
@@ -3335,7 +3355,7 @@ TEST_CASE("Test variable-length arrays of strings") {
   REQUIRE(!classProperty->componentType);
   REQUIRE(!classProperty->count);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
         stringProperty =
             view.getPropertyView<PropertyArrayView<std::string_view>>(
@@ -3354,7 +3374,7 @@ TEST_CASE("Test variable-length arrays of strings") {
     }
   }
 
-  SECTION("Wrong array offset type") {
+  SUBCASE("Wrong array offset type") {
     propertyTableProperty.arrayOffsetType =
         PropertyTableProperty::ArrayOffsetType::UINT8;
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
@@ -3385,7 +3405,7 @@ TEST_CASE("Test variable-length arrays of strings") {
         PropertyTableProperty::ArrayOffsetType::UINT32;
   }
 
-  SECTION("Wrong string offset type") {
+  SUBCASE("Wrong string offset type") {
     propertyTableProperty.stringOffsetType =
         PropertyTableProperty::StringOffsetType::UINT8;
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
@@ -3416,7 +3436,7 @@ TEST_CASE("Test variable-length arrays of strings") {
         PropertyTableProperty::StringOffsetType::UINT32;
   }
 
-  SECTION("Array offset values are not sorted ascending") {
+  SUBCASE("Array offset values are not sorted ascending") {
     uint32_t* offset = reinterpret_cast<uint32_t*>(
         model.buffers[arrayOffsetBuffer].cesium.data.data());
     offset[0] = static_cast<uint32_t>(1000);
@@ -3430,7 +3450,7 @@ TEST_CASE("Test variable-length arrays of strings") {
     offset[0] = 0;
   }
 
-  SECTION("String offset values are not sorted ascending") {
+  SUBCASE("String offset values are not sorted ascending") {
     uint32_t* offset = reinterpret_cast<uint32_t*>(
         model.buffers[stringOffsetBuffer].cesium.data.data());
     offset[0] = static_cast<uint32_t>(1000);
@@ -3444,7 +3464,7 @@ TEST_CASE("Test variable-length arrays of strings") {
     offset[0] = 0;
   }
 
-  SECTION("Array offset value points outside of value buffer") {
+  SUBCASE("Array offset value points outside of value buffer") {
     uint32_t* offset = reinterpret_cast<uint32_t*>(
         model.buffers[arrayOffsetBuffer].cesium.data.data());
     uint32_t previousValue = offset[propertyTable.count];
@@ -3459,7 +3479,7 @@ TEST_CASE("Test variable-length arrays of strings") {
     offset[propertyTable.count] = previousValue;
   }
 
-  SECTION("String offset value points outside of value buffer") {
+  SUBCASE("String offset value points outside of value buffer") {
     uint32_t* offset = reinterpret_cast<uint32_t*>(
         model.buffers[stringOffsetBuffer].cesium.data.data());
     uint32_t previousValue = offset[6];
@@ -3474,7 +3494,7 @@ TEST_CASE("Test variable-length arrays of strings") {
     offset[6] = previousValue;
   }
 
-  SECTION("Count and offset buffer both present") {
+  SUBCASE("Count and offset buffer both present") {
     testClassProperty.count = 3;
     PropertyTablePropertyView<PropertyArrayView<std::string_view>>
         boolArrayProperty =
@@ -3536,7 +3556,7 @@ TEST_CASE("Test with PropertyTableProperty offset, scale, min, max") {
   REQUIRE(classProperty->min);
   REQUIRE(classProperty->max);
 
-  SECTION("Use class property values") {
+  SUBCASE("Use class property values") {
     PropertyTablePropertyView<float> propertyView =
         view.getPropertyView<float>("TestClassProperty");
     REQUIRE(propertyView.status() == PropertyTablePropertyViewStatus::Valid);
@@ -3552,7 +3572,7 @@ TEST_CASE("Test with PropertyTableProperty offset, scale, min, max") {
     }
   }
 
-  SECTION("Use own property values") {
+  SUBCASE("Use own property values") {
     const float newOffset = 1.0f;
     const float newScale = -1.0f;
     const float newMin = -3.0f;
@@ -3630,7 +3650,7 @@ TEST_CASE(
   REQUIRE(classProperty->min);
   REQUIRE(classProperty->max);
 
-  SECTION("Use class property values") {
+  SUBCASE("Use class property values") {
     PropertyTablePropertyView<int8_t, true> propertyView =
         view.getPropertyView<int8_t, true>("TestClassProperty");
     REQUIRE(propertyView.status() == PropertyTablePropertyViewStatus::Valid);
@@ -3648,7 +3668,7 @@ TEST_CASE(
     }
   }
 
-  SECTION("Use own property values") {
+  SUBCASE("Use own property values") {
     const double newOffset = -0.5;
     const double newScale = 1.0;
     const double newMin = -1.5;
@@ -3716,7 +3736,7 @@ TEST_CASE("Test with PropertyTableProperty noData value") {
   REQUIRE(!classProperty->normalized);
   REQUIRE(classProperty->noData);
 
-  SECTION("Without default value") {
+  SUBCASE("Without default value") {
     PropertyTablePropertyView<int8_t> propertyView =
         view.getPropertyView<int8_t>("TestClassProperty");
     REQUIRE(propertyView.status() == PropertyTablePropertyViewStatus::Valid);
@@ -3733,7 +3753,7 @@ TEST_CASE("Test with PropertyTableProperty noData value") {
     }
   }
 
-  SECTION("With default value") {
+  SUBCASE("With default value") {
     const int8_t defaultValue = 100;
     testClassProperty.defaultProperty = defaultValue;
     classProperty = view.getClassProperty("TestClassProperty");
@@ -3797,7 +3817,7 @@ TEST_CASE("Test with PropertyTableProperty noData value (normalized)") {
   REQUIRE(classProperty->normalized);
   REQUIRE(classProperty->noData);
 
-  SECTION("Without default value") {
+  SUBCASE("Without default value") {
     PropertyTablePropertyView<int8_t, true> propertyView =
         view.getPropertyView<int8_t, true>("TestClassProperty");
     REQUIRE(propertyView.status() == PropertyTablePropertyViewStatus::Valid);
@@ -3814,7 +3834,7 @@ TEST_CASE("Test with PropertyTableProperty noData value (normalized)") {
     }
   }
 
-  SECTION("With default value") {
+  SUBCASE("With default value") {
     const double defaultValue = 10.5;
     testClassProperty.defaultProperty = defaultValue;
     classProperty = view.getClassProperty("TestClassProperty");
@@ -3871,7 +3891,7 @@ TEST_CASE(
   REQUIRE(!classProperty->normalized);
   REQUIRE(classProperty->defaultProperty);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
     REQUIRE(
@@ -3885,7 +3905,7 @@ TEST_CASE(
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyTablePropertyView<glm::uvec3> uvec3Invalid =
         view.getPropertyView<glm::uvec3>("TestClassProperty");
     REQUIRE(
@@ -3893,7 +3913,7 @@ TEST_CASE(
         PropertyTablePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyTablePropertyView<uint8_t> uint8Invalid =
         view.getPropertyView<uint8_t>("TestClassProperty");
     REQUIRE(
@@ -3901,7 +3921,7 @@ TEST_CASE(
         PropertyTablePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as normalized") {
+  SUBCASE("Access incorrectly as normalized") {
     PropertyTablePropertyView<uint32_t, true> uint32NormalizedInvalid =
         view.getPropertyView<uint32_t, true>("TestClassProperty");
     REQUIRE(
@@ -3909,7 +3929,7 @@ TEST_CASE(
         PropertyTablePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Invalid default value") {
+  SUBCASE("Invalid default value") {
     testClassProperty.defaultProperty = "not a number";
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
@@ -3918,7 +3938,7 @@ TEST_CASE(
         PropertyTablePropertyViewStatus::ErrorInvalidDefaultValue);
   }
 
-  SECTION("No default value") {
+  SUBCASE("No default value") {
     testClassProperty.defaultProperty.reset();
     PropertyTablePropertyView<uint32_t> uint32Property =
         view.getPropertyView<uint32_t>("TestClassProperty");
@@ -4988,23 +5008,23 @@ TEST_CASE("Test callback for vecN array PropertyTableProperty (normalized)") {
 TEST_CASE("Test callback for matN array PropertyTableProperty") {
   Model model;
   // clang-format off
-  std::vector<glm::i32mat2x2> values = {
-      glm::i32mat2x2(
+  std::vector<glm::imat2x2> values = {
+      glm::imat2x2(
         12, 34,
         -30, 20),
-      glm::i32mat2x2(
+      glm::imat2x2(
         -2, -2,
         0, 1),
-      glm::i32mat2x2(
+      glm::imat2x2(
         1, 2,
         8, 5),
-      glm::i32mat2x2(
+      glm::imat2x2(
         -100, 3,
         84, 6),
-      glm::i32mat2x2(
+      glm::imat2x2(
         2, 12,
         -2, -2),
-      glm::i32mat2x2(
+      glm::imat2x2(
         40, 61,
         7, -3),
   };
@@ -5058,10 +5078,10 @@ TEST_CASE("Test callback for matN array PropertyTableProperty") {
 
         if constexpr (std::is_same_v<
                           PropertyTablePropertyView<
-                              PropertyArrayView<glm::i32mat2x2>>,
+                              PropertyArrayView<glm::imat2x2>>,
                           decltype(propertyValue)>) {
           for (int64_t i = 0; i < propertyValue.size(); ++i) {
-            PropertyArrayView<glm::i32mat2x2> member = propertyValue.getRaw(i);
+            PropertyArrayView<glm::imat2x2> member = propertyValue.getRaw(i);
             for (int64_t j = 0; j < member.size(); ++j) {
               REQUIRE(member[j] == values[static_cast<size_t>(i * 2 + j)]);
             }

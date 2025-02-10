@@ -42,7 +42,10 @@ public:
   CesiumAsync::Future<TileLoadResult>
   loadTileContent(const TileLoadInput& loadInput) override;
 
-  TileChildrenResult createTileChildren(const Tile& tile) override;
+  TileChildrenResult createTileChildren(
+      const Tile& tile,
+      const CesiumGeospatial::Ellipsoid& ellipsoid
+          CESIUM_DEFAULT_ELLIPSOID) override;
 
   uint32_t getSubtreeLevels() const noexcept;
 
@@ -55,11 +58,6 @@ public:
       Cesium3DTilesContent::SubtreeAvailability&& subtreeAvailability);
 
 private:
-  static std::string resolveUrl(
-      const std::string& baseUrl,
-      const std::string& urlTemplate,
-      const CesiumGeometry::QuadtreeTileID& quadtreeID);
-
   std::string _baseUrl;
   std::string _contentUrlTemplate;
   std::string _subtreeUrlTemplate;

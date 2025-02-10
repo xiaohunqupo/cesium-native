@@ -1,7 +1,7 @@
 #pragma once
 
-#include "GlobeRectangle.h"
-#include "Library.h"
+#include <CesiumGeospatial/GlobeRectangle.h>
+#include <CesiumGeospatial/Library.h>
 
 #include <glm/vec2.hpp>
 
@@ -24,7 +24,7 @@ namespace CesiumGeospatial {
 class CESIUMGEOSPATIAL_API CartographicPolygon final {
 public:
   /**
-   * @brief Constructs a 2D polygon that can be rasterized onto {@link Tileset}
+   * @brief Constructs a 2D polygon that can be rasterized onto {@link Cesium3DTilesSelection::Tileset}
    * objects.
    *
    * @param polygon An array of longitude-latitude points in radians defining
@@ -63,6 +63,34 @@ public:
   getBoundingRectangle() const {
     return this->_boundingRectangle;
   }
+
+  /**
+   * @brief Determines whether a globe rectangle is completely inside any of the
+   * polygons in a list.
+   *
+   * @param rectangle The {@link CesiumGeospatial::GlobeRectangle} of the tile.
+   * @param cartographicPolygons The list of polygons to check.
+   * @return True if the rectangle is completely inside a polygon; otherwise,
+   * false.
+   */
+  static bool rectangleIsWithinPolygons(
+      const CesiumGeospatial::GlobeRectangle& rectangle,
+      const std::vector<CesiumGeospatial::CartographicPolygon>&
+          cartographicPolygons) noexcept;
+
+  /**
+   * @brief Determines whether a globe rectangle is completely outside all the
+   * polygons in a list.
+   *
+   * @param rectangle The {@link CesiumGeospatial::GlobeRectangle} of the tile.
+   * @param cartographicPolygons The list of polygons to check.
+   * @return True if the rectangle is completely outside all the polygons;
+   * otherwise, false.
+   */
+  static bool rectangleIsOutsidePolygons(
+      const CesiumGeospatial::GlobeRectangle& rectangle,
+      const std::vector<CesiumGeospatial::CartographicPolygon>&
+          cartographicPolygons) noexcept;
 
 private:
   std::vector<glm::dvec2> _vertices;

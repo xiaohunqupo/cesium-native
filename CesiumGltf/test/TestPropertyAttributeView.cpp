@@ -1,9 +1,38 @@
-#include "CesiumGltf/PropertyAttributeView.h"
+#include <CesiumGltf/Accessor.h>
+#include <CesiumGltf/Buffer.h>
+#include <CesiumGltf/BufferView.h>
+#include <CesiumGltf/Class.h>
+#include <CesiumGltf/ClassProperty.h>
+#include <CesiumGltf/ExtensionModelExtStructuralMetadata.h>
+#include <CesiumGltf/Mesh.h>
+#include <CesiumGltf/MeshPrimitive.h>
+#include <CesiumGltf/Model.h>
+#include <CesiumGltf/PropertyAttribute.h>
+#include <CesiumGltf/PropertyAttributeProperty.h>
+#include <CesiumGltf/PropertyAttributePropertyView.h>
+#include <CesiumGltf/PropertyAttributeView.h>
+#include <CesiumGltf/PropertyTransformations.h>
+#include <CesiumGltf/PropertyType.h>
+#include <CesiumGltf/PropertyTypeTraits.h>
+#include <CesiumGltf/Schema.h>
+#include <CesiumUtility/Assert.h>
 
-#include <catch2/catch.hpp>
-#include <gsl/span>
+#include <doctest/doctest.h>
+#include <glm/ext/matrix_double2x2.hpp>
+#include <glm/ext/matrix_float2x2.hpp>
+#include <glm/ext/vector_double2.hpp>
+#include <glm/ext/vector_float2.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_int2_sized.hpp>
+#include <glm/ext/vector_uint2_sized.hpp>
+#include <glm/ext/vector_uint3_sized.hpp>
+#include <glm/fwd.hpp>
 
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <optional>
+#include <string>
 #include <vector>
 
 using namespace CesiumGltf;
@@ -57,7 +86,7 @@ void addAttributeToModel(
     accessor.type = Accessor::Type::MAT4;
     break;
   default:
-    assert(false && "Input type is not supported as an accessor type");
+    CESIUM_ASSERT(false && "Input type is not supported as an accessor type");
     break;
   }
 
@@ -75,14 +104,11 @@ void addAttributeToModel(
   case PropertyComponentType::Uint16:
     accessor.componentType = Accessor::ComponentType::UNSIGNED_SHORT;
     break;
-  case PropertyComponentType::Uint32:
-    accessor.componentType = Accessor::ComponentType::UNSIGNED_INT;
-    break;
   case PropertyComponentType::Float32:
     accessor.componentType = Accessor::ComponentType::FLOAT;
     break;
   default:
-    assert(
+    CESIUM_ASSERT(
         false &&
         "Input component type is not supported as an accessor component type");
     break;
@@ -208,7 +234,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
   REQUIRE(!classProperty->array);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyAttributePropertyView<uint16_t> uint16Property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
     REQUIRE(
@@ -219,7 +245,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyAttributePropertyView<glm::u16vec2> u16vec2Invalid =
         view.getPropertyView<glm::u16vec2>(primitive, "TestClassProperty");
     REQUIRE(
@@ -227,7 +253,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyAttributePropertyView<uint8_t> uint8Invalid =
         view.getPropertyView<uint8_t>(primitive, "TestClassProperty");
     REQUIRE(
@@ -247,7 +273,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as normalized") {
+  SUBCASE("Access incorrectly as normalized") {
     PropertyAttributePropertyView<uint16_t, true> normalizedInvalid =
         view.getPropertyView<uint16_t, true>(primitive, "TestClassProperty");
     REQUIRE(
@@ -255,7 +281,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Buffer view points outside of the real buffer length") {
+  SUBCASE("Buffer view points outside of the real buffer length") {
     model.buffers[bufferIndex].cesium.data.resize(4);
     PropertyAttributePropertyView<uint16_t> property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -264,7 +290,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorBufferViewOutOfBounds);
   }
 
-  SECTION("Wrong buffer index") {
+  SUBCASE("Wrong buffer index") {
     model.bufferViews[bufferViewIndex].buffer = 2;
     PropertyAttributePropertyView<uint16_t> property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -273,7 +299,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorInvalidBuffer);
   }
 
-  SECTION("Accessor view points outside of buffer viwe length") {
+  SUBCASE("Accessor view points outside of buffer viwe length") {
     model.accessors[accessorIndex].count = 10;
     PropertyAttributePropertyView<uint16_t> property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -282,7 +308,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorAccessorOutOfBounds);
   }
 
-  SECTION("Wrong buffer view index") {
+  SUBCASE("Wrong buffer view index") {
     model.accessors[accessorIndex].bufferView = -1;
     PropertyAttributePropertyView<uint16_t> property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -291,7 +317,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorInvalidBufferView);
   }
 
-  SECTION("Wrong accessor normalization") {
+  SUBCASE("Wrong accessor normalization") {
     model.accessors[accessorIndex].normalized = true;
     PropertyAttributePropertyView<uint16_t> property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -300,7 +326,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
                                  ErrorAccessorNormalizationMismatch);
   }
 
-  SECTION("Wrong accessor component type") {
+  SUBCASE("Wrong accessor component type") {
     model.accessors[accessorIndex].componentType =
         Accessor::ComponentType::SHORT;
     PropertyAttributePropertyView<uint16_t> property =
@@ -310,7 +336,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
                                  ErrorAccessorComponentTypeMismatch);
   }
 
-  SECTION("Wrong accessor type") {
+  SUBCASE("Wrong accessor type") {
     model.accessors[accessorIndex].type = Accessor::Type::VEC2;
     PropertyAttributePropertyView<uint16_t> property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -319,7 +345,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorAccessorTypeMismatch);
   }
 
-  SECTION("Wrong accessor index") {
+  SUBCASE("Wrong accessor index") {
     primitive.attributes[attributeName] = -1;
     PropertyAttributePropertyView<uint16_t> property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -328,7 +354,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorInvalidAccessor);
   }
 
-  SECTION("Missing attribute") {
+  SUBCASE("Missing attribute") {
     primitive.attributes.clear();
     PropertyAttributePropertyView<uint16_t> property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -379,7 +405,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty (normalized)") {
   REQUIRE(!classProperty->array);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyAttributePropertyView<uint8_t, true> uint8Property =
         view.getPropertyView<uint8_t, true>(primitive, "TestClassProperty");
     REQUIRE(
@@ -391,7 +417,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty (normalized)") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyAttributePropertyView<glm::u8vec2, true> u8vec2Invalid =
         view.getPropertyView<glm::u8vec2, true>(primitive, "TestClassProperty");
     REQUIRE(
@@ -399,7 +425,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyAttributePropertyView<uint16_t, true> uint16Invalid =
         view.getPropertyView<uint16_t, true>(primitive, "TestClassProperty");
     REQUIRE(
@@ -413,7 +439,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as non-normalized") {
+  SUBCASE("Access incorrectly as non-normalized") {
     PropertyAttributePropertyView<uint8_t> normalizedInvalid =
         view.getPropertyView<uint8_t>(primitive, "TestClassProperty");
     REQUIRE(
@@ -421,7 +447,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Access incorrectly as double") {
+  SUBCASE("Access incorrectly as double") {
     PropertyAttributePropertyView<double> doubleInvalid =
         view.getPropertyView<double>(primitive, "TestClassProperty");
     REQUIRE(
@@ -429,7 +455,7 @@ TEST_CASE("Test scalar PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Wrong accessor normalization") {
+  SUBCASE("Wrong accessor normalization") {
     model.accessors[accessorIndex].normalized = false;
     PropertyAttributePropertyView<uint8_t, true> property =
         view.getPropertyView<uint8_t, true>(primitive, "TestClassProperty");
@@ -485,7 +511,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
   REQUIRE(!classProperty->array);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyAttributePropertyView<glm::u8vec2> u8vec2Property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
     REQUIRE(
@@ -496,7 +522,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyAttributePropertyView<uint8_t> uint8Invalid =
         view.getPropertyView<uint8_t>(primitive, "TestClassProperty");
     REQUIRE(
@@ -510,7 +536,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyAttributePropertyView<glm::vec2> vec2Invalid =
         view.getPropertyView<glm::vec2>(primitive, "TestClassProperty");
     REQUIRE(
@@ -518,7 +544,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as normalized") {
+  SUBCASE("Access incorrectly as normalized") {
     PropertyAttributePropertyView<glm::u8vec2, true> normalizedInvalid =
         view.getPropertyView<glm::u8vec2, true>(primitive, "TestClassProperty");
     REQUIRE(
@@ -526,7 +552,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Buffer view points outside of the real buffer length") {
+  SUBCASE("Buffer view points outside of the real buffer length") {
     model.buffers[bufferIndex].cesium.data.resize(4);
     PropertyAttributePropertyView<glm::u8vec2> property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
@@ -535,7 +561,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorBufferViewOutOfBounds);
   }
 
-  SECTION("Wrong buffer index") {
+  SUBCASE("Wrong buffer index") {
     model.bufferViews[bufferViewIndex].buffer = 2;
     PropertyAttributePropertyView<glm::u8vec2> property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
@@ -544,7 +570,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorInvalidBuffer);
   }
 
-  SECTION("Accessor view points outside of buffer viwe length") {
+  SUBCASE("Accessor view points outside of buffer viwe length") {
     model.accessors[accessorIndex].count = 10;
     PropertyAttributePropertyView<glm::u8vec2> property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
@@ -553,7 +579,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorAccessorOutOfBounds);
   }
 
-  SECTION("Wrong buffer view index") {
+  SUBCASE("Wrong buffer view index") {
     model.accessors[accessorIndex].bufferView = -1;
     PropertyAttributePropertyView<glm::u8vec2> property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
@@ -562,7 +588,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorInvalidBufferView);
   }
 
-  SECTION("Wrong accessor normalization") {
+  SUBCASE("Wrong accessor normalization") {
     model.accessors[accessorIndex].normalized = true;
     PropertyAttributePropertyView<glm::u8vec2> property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
@@ -571,7 +597,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
                                  ErrorAccessorNormalizationMismatch);
   }
 
-  SECTION("Wrong accessor component type") {
+  SUBCASE("Wrong accessor component type") {
     model.accessors[accessorIndex].componentType =
         Accessor::ComponentType::BYTE;
     PropertyAttributePropertyView<glm::u8vec2> property =
@@ -581,7 +607,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
                                  ErrorAccessorComponentTypeMismatch);
   }
 
-  SECTION("Wrong accessor type") {
+  SUBCASE("Wrong accessor type") {
     model.accessors[accessorIndex].type = Accessor::Type::SCALAR;
     PropertyAttributePropertyView<glm::u8vec2> property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
@@ -590,7 +616,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorAccessorTypeMismatch);
   }
 
-  SECTION("Wrong accessor index") {
+  SUBCASE("Wrong accessor index") {
     primitive.attributes[attributeName] = -1;
     PropertyAttributePropertyView<glm::u8vec2> property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
@@ -599,7 +625,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorInvalidAccessor);
   }
 
-  SECTION("Missing attribute") {
+  SUBCASE("Missing attribute") {
     primitive.attributes.clear();
     PropertyAttributePropertyView<glm::u8vec2> property =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
@@ -654,7 +680,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty (normalized)") {
   REQUIRE(!classProperty->array);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyAttributePropertyView<glm::u8vec2, true> u8vec2Property =
         view.getPropertyView<glm::u8vec2, true>(primitive, "TestClassProperty");
     REQUIRE(
@@ -666,7 +692,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty (normalized)") {
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyAttributePropertyView<uint8_t, true> uint8Invalid =
         view.getPropertyView<uint8_t, true>(primitive, "TestClassProperty");
     REQUIRE(
@@ -680,7 +706,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyAttributePropertyView<glm::u16vec2, true> u16vec2Invalid =
         view.getPropertyView<glm::u16vec2, true>(
             primitive,
@@ -696,7 +722,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as non-normalized") {
+  SUBCASE("Access incorrectly as non-normalized") {
     PropertyAttributePropertyView<glm::u8vec2> normalizedInvalid =
         view.getPropertyView<glm::u8vec2>(primitive, "TestClassProperty");
     REQUIRE(
@@ -704,7 +730,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Access incorrectly as dvec2") {
+  SUBCASE("Access incorrectly as dvec2") {
     PropertyAttributePropertyView<glm::dvec2> dvec2Invalid =
         view.getPropertyView<glm::dvec2>(primitive, "TestClassProperty");
     REQUIRE(
@@ -712,7 +738,7 @@ TEST_CASE("Test vecN PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Wrong accessor normalization") {
+  SUBCASE("Wrong accessor normalization") {
     model.accessors[accessorIndex].normalized = false;
     PropertyAttributePropertyView<glm::u8vec2, true> property =
         view.getPropertyView<glm::u8vec2, true>(primitive, "TestClassProperty");
@@ -729,17 +755,17 @@ TEST_CASE("Test matN PropertyAttributeProperty") {
 
   const std::string attributeName = "_ATTRIBUTE";
   // clang-format off
-  std::vector<glm::umat2x2> data = {
-      glm::umat2x2(
+  std::vector<glm::u16mat2x2> data = {
+      glm::u16mat2x2(
         12, 34,
         30, 1),
-      glm::umat2x2(
+      glm::u16mat2x2(
         11, 8,
         73, 102),
-      glm::umat2x2(
+      glm::u16mat2x2(
         1, 0,
         63, 2),
-      glm::umat2x2(
+      glm::u16mat2x2(
         4, 8,
         3, 23)};
   // clang-format on
@@ -756,7 +782,7 @@ TEST_CASE("Test matN PropertyAttributeProperty") {
   Class& testClass = schema.classes["TestClass"];
   ClassProperty& testClassProperty = testClass.properties["TestClassProperty"];
   testClassProperty.type = ClassProperty::Type::MAT2;
-  testClassProperty.componentType = ClassProperty::ComponentType::UINT32;
+  testClassProperty.componentType = ClassProperty::ComponentType::UINT16;
 
   PropertyAttribute& propertyAttribute =
       metadata.propertyAttributes.emplace_back();
@@ -773,43 +799,44 @@ TEST_CASE("Test matN PropertyAttributeProperty") {
       view.getClassProperty("TestClassProperty");
   REQUIRE(classProperty);
   REQUIRE(classProperty->type == ClassProperty::Type::MAT2);
-  REQUIRE(classProperty->componentType == ClassProperty::ComponentType::UINT32);
+  REQUIRE(classProperty->componentType == ClassProperty::ComponentType::UINT16);
   REQUIRE(classProperty->count == std::nullopt);
   REQUIRE(!classProperty->array);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Access correct type") {
-    PropertyAttributePropertyView<glm::umat2x2> umat2x2Property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+  SUBCASE("Access correct type") {
+    PropertyAttributePropertyView<glm::u16mat2x2> u16mat2x2Property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
-        umat2x2Property.status() == PropertyAttributePropertyViewStatus::Valid);
+        u16mat2x2Property.status() ==
+        PropertyAttributePropertyViewStatus::Valid);
     for (size_t i = 0; i < data.size(); ++i) {
-      REQUIRE(umat2x2Property.getRaw(static_cast<int64_t>(i)) == data[i]);
-      REQUIRE(umat2x2Property.get(static_cast<int64_t>(i)) == data[i]);
+      REQUIRE(u16mat2x2Property.getRaw(static_cast<int64_t>(i)) == data[i]);
+      REQUIRE(u16mat2x2Property.get(static_cast<int64_t>(i)) == data[i]);
     }
   }
 
-  SECTION("Access wrong type") {
-    PropertyAttributePropertyView<uint32_t> uint32Invalid =
-        view.getPropertyView<uint32_t>(primitive, "TestClassProperty");
+  SUBCASE("Access wrong type") {
+    PropertyAttributePropertyView<uint16_t> uint16Invalid =
+        view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
     REQUIRE(
-        uint32Invalid.status() ==
+        uint16Invalid.status() ==
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
 
-    PropertyAttributePropertyView<glm::uvec2> uvec2Invalid =
-        view.getPropertyView<glm::uvec2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16vec2> u16vec2Invalid =
+        view.getPropertyView<glm::u16vec2>(primitive, "TestClassProperty");
     REQUIRE(
-        uvec2Invalid.status() ==
+        u16vec2Invalid.status() ==
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
 
-    PropertyAttributePropertyView<glm::umat4x4> umat4x4Invalid =
-        view.getPropertyView<glm::umat4x4>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat4x4> u16mat4x4Invalid =
+        view.getPropertyView<glm::u16mat4x4>(primitive, "TestClassProperty");
     REQUIRE(
-        umat4x4Invalid.status() ==
+        u16mat4x4Invalid.status() ==
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyAttributePropertyView<glm::mat2> mat2Invalid =
         view.getPropertyView<glm::mat2>(primitive, "TestClassProperty");
     REQUIRE(
@@ -817,9 +844,9 @@ TEST_CASE("Test matN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as normalized") {
-    PropertyAttributePropertyView<glm::umat2x2, true> normalizedInvalid =
-        view.getPropertyView<glm::umat2x2, true>(
+  SUBCASE("Access incorrectly as normalized") {
+    PropertyAttributePropertyView<glm::u16mat2x2, true> normalizedInvalid =
+        view.getPropertyView<glm::u16mat2x2, true>(
             primitive,
             "TestClassProperty");
     REQUIRE(
@@ -827,83 +854,83 @@ TEST_CASE("Test matN PropertyAttributeProperty") {
         PropertyAttributePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Buffer view points outside of the real buffer length") {
+  SUBCASE("Buffer view points outside of the real buffer length") {
     model.buffers[bufferIndex].cesium.data.resize(4);
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() ==
         PropertyAttributePropertyViewStatus::ErrorBufferViewOutOfBounds);
   }
 
-  SECTION("Wrong buffer index") {
+  SUBCASE("Wrong buffer index") {
     model.bufferViews[bufferViewIndex].buffer = 2;
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() ==
         PropertyAttributePropertyViewStatus::ErrorInvalidBuffer);
   }
 
-  SECTION("Accessor view points outside of buffer viwe length") {
+  SUBCASE("Accessor view points outside of buffer viwe length") {
     model.accessors[accessorIndex].count = 10;
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() ==
         PropertyAttributePropertyViewStatus::ErrorAccessorOutOfBounds);
   }
 
-  SECTION("Wrong buffer view index") {
+  SUBCASE("Wrong buffer view index") {
     model.accessors[accessorIndex].bufferView = -1;
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() ==
         PropertyAttributePropertyViewStatus::ErrorInvalidBufferView);
   }
 
-  SECTION("Wrong accessor normalization") {
+  SUBCASE("Wrong accessor normalization") {
     model.accessors[accessorIndex].normalized = true;
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() == PropertyAttributePropertyViewStatus::
                                  ErrorAccessorNormalizationMismatch);
   }
 
-  SECTION("Wrong accessor component type") {
+  SUBCASE("Wrong accessor component type") {
     model.accessors[accessorIndex].componentType =
         Accessor::ComponentType::BYTE;
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() == PropertyAttributePropertyViewStatus::
                                  ErrorAccessorComponentTypeMismatch);
   }
 
-  SECTION("Wrong accessor type") {
+  SUBCASE("Wrong accessor type") {
     model.accessors[accessorIndex].type = Accessor::Type::SCALAR;
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() ==
         PropertyAttributePropertyViewStatus::ErrorAccessorTypeMismatch);
   }
 
-  SECTION("Wrong accessor index") {
+  SUBCASE("Wrong accessor index") {
     primitive.attributes[attributeName] = -1;
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() ==
         PropertyAttributePropertyViewStatus::ErrorInvalidAccessor);
   }
 
-  SECTION("Missing attribute") {
+  SUBCASE("Missing attribute") {
     primitive.attributes.clear();
-    PropertyAttributePropertyView<glm::umat2x2> property =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+    PropertyAttributePropertyView<glm::u16mat2x2> property =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         property.status() ==
         PropertyAttributePropertyViewStatus::ErrorMissingAttribute);
@@ -917,22 +944,22 @@ TEST_CASE("Test matN PropertyAttributeProperty (normalized)") {
 
   const std::string attributeName = "_ATTRIBUTE";
   // clang-format off
-  std::vector<glm::umat2x2> data = {
-      glm::umat2x2(
+  std::vector<glm::u16mat2x2> data = {
+      glm::u16mat2x2(
         12, 34,
         30, 1),
-      glm::umat2x2(
+      glm::u16mat2x2(
         11, 8,
         73, 102),
-      glm::umat2x2(
+      glm::u16mat2x2(
         1, 0,
         63, 2),
-      glm::umat2x2(
+      glm::u16mat2x2(
         4, 8,
         3, 23)};
   // clang-format on
 
-  addAttributeToModel<glm::umat2x2, true>(
+  addAttributeToModel<glm::u16mat2x2, true>(
       model,
       primitive,
       attributeName,
@@ -946,7 +973,7 @@ TEST_CASE("Test matN PropertyAttributeProperty (normalized)") {
   Class& testClass = schema.classes["TestClass"];
   ClassProperty& testClassProperty = testClass.properties["TestClassProperty"];
   testClassProperty.type = ClassProperty::Type::MAT2;
-  testClassProperty.componentType = ClassProperty::ComponentType::UINT32;
+  testClassProperty.componentType = ClassProperty::ComponentType::UINT16;
   testClassProperty.normalized = true;
 
   PropertyAttribute& propertyAttribute =
@@ -964,48 +991,51 @@ TEST_CASE("Test matN PropertyAttributeProperty (normalized)") {
       view.getClassProperty("TestClassProperty");
   REQUIRE(classProperty);
   REQUIRE(classProperty->type == ClassProperty::Type::MAT2);
-  REQUIRE(classProperty->componentType == ClassProperty::ComponentType::UINT32);
+  REQUIRE(classProperty->componentType == ClassProperty::ComponentType::UINT16);
   REQUIRE(classProperty->count == std::nullopt);
   REQUIRE(!classProperty->array);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Access correct type") {
-    PropertyAttributePropertyView<glm::umat2x2, true> umat2x2Property =
-        view.getPropertyView<glm::umat2x2, true>(
+  SUBCASE("Access correct type") {
+    PropertyAttributePropertyView<glm::u16mat2x2, true> u16mat2x2Property =
+        view.getPropertyView<glm::u16mat2x2, true>(
             primitive,
             "TestClassProperty");
     REQUIRE(
-        umat2x2Property.status() == PropertyAttributePropertyViewStatus::Valid);
+        u16mat2x2Property.status() ==
+        PropertyAttributePropertyViewStatus::Valid);
     for (size_t i = 0; i < data.size(); ++i) {
-      REQUIRE(umat2x2Property.getRaw(static_cast<int64_t>(i)) == data[i]);
+      REQUIRE(u16mat2x2Property.getRaw(static_cast<int64_t>(i)) == data[i]);
       REQUIRE(
-          umat2x2Property.get(static_cast<int64_t>(i)) == normalize(data[i]));
+          u16mat2x2Property.get(static_cast<int64_t>(i)) == normalize(data[i]));
     }
   }
 
-  SECTION("Access wrong type") {
-    PropertyAttributePropertyView<uint32_t, true> uint32Invalid =
-        view.getPropertyView<uint32_t, true>(primitive, "TestClassProperty");
+  SUBCASE("Access wrong type") {
+    PropertyAttributePropertyView<uint16_t, true> uint16Invalid =
+        view.getPropertyView<uint16_t, true>(primitive, "TestClassProperty");
     REQUIRE(
-        uint32Invalid.status() ==
+        uint16Invalid.status() ==
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
 
-    PropertyAttributePropertyView<glm::uvec2, true> uvec2Invalid =
-        view.getPropertyView<glm::uvec2, true>(primitive, "TestClassProperty");
-    REQUIRE(
-        uvec2Invalid.status() ==
-        PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
-
-    PropertyAttributePropertyView<glm::umat4x4, true> umat4x4Invalid =
-        view.getPropertyView<glm::umat4x4, true>(
+    PropertyAttributePropertyView<glm::u16vec2, true> u16vec2Invalid =
+        view.getPropertyView<glm::u16vec2, true>(
             primitive,
             "TestClassProperty");
     REQUIRE(
-        umat4x4Invalid.status() ==
+        u16vec2Invalid.status() ==
+        PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
+
+    PropertyAttributePropertyView<glm::u16mat4x4, true> u16mat4x4Invalid =
+        view.getPropertyView<glm::u16mat4x4, true>(
+            primitive,
+            "TestClassProperty");
+    REQUIRE(
+        u16mat4x4Invalid.status() ==
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyAttributePropertyView<glm::imat2x2, true> imat2Invalid =
         view.getPropertyView<glm::imat2x2, true>(
             primitive,
@@ -1015,15 +1045,15 @@ TEST_CASE("Test matN PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as non-normalized") {
-    PropertyAttributePropertyView<glm::umat2x2> nonNormalizedInvalid =
-        view.getPropertyView<glm::umat2x2>(primitive, "TestClassProperty");
+  SUBCASE("Access incorrectly as non-normalized") {
+    PropertyAttributePropertyView<glm::u16mat2x2> nonNormalizedInvalid =
+        view.getPropertyView<glm::u16mat2x2>(primitive, "TestClassProperty");
     REQUIRE(
         nonNormalizedInvalid.status() ==
         PropertyAttributePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Access incorrectly as dmat2") {
+  SUBCASE("Access incorrectly as dmat2") {
     PropertyAttributePropertyView<glm::dmat2> dmat2Invalid =
         view.getPropertyView<glm::dmat2>(primitive, "TestClassProperty");
     REQUIRE(
@@ -1031,10 +1061,10 @@ TEST_CASE("Test matN PropertyAttributeProperty (normalized)") {
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Wrong accessor normalization") {
+  SUBCASE("Wrong accessor normalization") {
     model.accessors[accessorIndex].normalized = false;
-    PropertyAttributePropertyView<glm::umat2x2, true> property =
-        view.getPropertyView<glm::umat2x2, true>(
+    PropertyAttributePropertyView<glm::u16mat2x2, true> property =
+        view.getPropertyView<glm::u16mat2x2, true>(
             primitive,
             "TestClassProperty");
     REQUIRE(
@@ -1096,7 +1126,7 @@ TEST_CASE("Test with PropertyAttributeProperty offset, scale, min, max") {
   REQUIRE(classProperty->min);
   REQUIRE(classProperty->max);
 
-  SECTION("Use class property values") {
+  SUBCASE("Use class property values") {
     PropertyAttributePropertyView<float> property =
         view.getPropertyView<float>(primitive, "TestClassProperty");
     REQUIRE(property.status() == PropertyAttributePropertyViewStatus::Valid);
@@ -1112,7 +1142,7 @@ TEST_CASE("Test with PropertyAttributeProperty offset, scale, min, max") {
     }
   }
 
-  SECTION("Use own property values") {
+  SUBCASE("Use own property values") {
     const float newOffset = 0.5f;
     const float newScale = -1.0f;
     const float newMin = -3.5f;
@@ -1195,7 +1225,7 @@ TEST_CASE("Test with PropertyAttributeProperty offset, scale, min, max "
       glm::dvec2(0, 0.5),
       glm::dvec2(0.5, 0.5)};
 
-  SECTION("Use class property values") {
+  SUBCASE("Use class property values") {
     PropertyAttributePropertyView<uint8_t, true> property =
         view.getPropertyView<uint8_t, true>(primitive, "TestClassProperty");
     REQUIRE(property.status() == PropertyAttributePropertyViewStatus::Valid);
@@ -1212,7 +1242,7 @@ TEST_CASE("Test with PropertyAttributeProperty offset, scale, min, max "
     }
   }
 
-  SECTION("Use own property values") {
+  SUBCASE("Use own property values") {
     const double newOffset = 2.0;
     const double newScale = 5.0;
     const double newMin = 10.0;
@@ -1280,7 +1310,7 @@ TEST_CASE("Test with PropertyAttributeProperty noData") {
   REQUIRE(!classProperty->array);
   REQUIRE(!classProperty->normalized);
 
-  SECTION("Without default value") {
+  SUBCASE("Without default value") {
     PropertyAttributePropertyView<uint8_t> property =
         view.getPropertyView<uint8_t>(primitive, "TestClassProperty");
     REQUIRE(property.status() == PropertyAttributePropertyViewStatus::Valid);
@@ -1298,7 +1328,7 @@ TEST_CASE("Test with PropertyAttributeProperty noData") {
     }
   }
 
-  SECTION("With default value") {
+  SUBCASE("With default value") {
     const uint8_t defaultValue = 255;
     testClassProperty.defaultProperty = defaultValue;
 
@@ -1362,7 +1392,7 @@ TEST_CASE("Test with PropertyAttributeProperty noData (normalized)") {
   REQUIRE(!classProperty->array);
   REQUIRE(classProperty->normalized);
 
-  SECTION("Without default value") {
+  SUBCASE("Without default value") {
     PropertyAttributePropertyView<uint8_t, true> property =
         view.getPropertyView<uint8_t, true>(primitive, "TestClassProperty");
     REQUIRE(property.status() == PropertyAttributePropertyViewStatus::Valid);
@@ -1380,7 +1410,7 @@ TEST_CASE("Test with PropertyAttributeProperty noData (normalized)") {
     }
   }
 
-  SECTION("With default value") {
+  SUBCASE("With default value") {
     const double defaultValue = -1.0;
     testClassProperty.defaultProperty = defaultValue;
 
@@ -1447,7 +1477,7 @@ TEST_CASE(
   REQUIRE(!classProperty->normalized);
   REQUIRE(classProperty->defaultProperty);
 
-  SECTION("Access correct type") {
+  SUBCASE("Access correct type") {
     PropertyAttributePropertyView<uint16_t> uint16Property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
     REQUIRE(
@@ -1461,7 +1491,7 @@ TEST_CASE(
     }
   }
 
-  SECTION("Access wrong type") {
+  SUBCASE("Access wrong type") {
     PropertyAttributePropertyView<glm::u16vec2> u16vec2Invalid =
         view.getPropertyView<glm::u16vec2>(primitive, "TestClassProperty");
     REQUIRE(
@@ -1469,7 +1499,7 @@ TEST_CASE(
         PropertyAttributePropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Access wrong component type") {
+  SUBCASE("Access wrong component type") {
     PropertyAttributePropertyView<uint8_t> uint8Invalid =
         view.getPropertyView<uint8_t>(primitive, "TestClassProperty");
     REQUIRE(
@@ -1477,7 +1507,7 @@ TEST_CASE(
         PropertyAttributePropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Access incorrectly as normalized") {
+  SUBCASE("Access incorrectly as normalized") {
     PropertyAttributePropertyView<uint16_t, true> normalizedInvalid =
         view.getPropertyView<uint16_t, true>(primitive, "TestClassProperty");
     REQUIRE(
@@ -1485,7 +1515,7 @@ TEST_CASE(
         PropertyAttributePropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Invalid default value") {
+  SUBCASE("Invalid default value") {
     testClassProperty.defaultProperty = "not a number";
     PropertyAttributePropertyView<uint16_t> uint16Property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -1494,7 +1524,7 @@ TEST_CASE(
         PropertyAttributePropertyViewStatus::ErrorInvalidDefaultValue);
   }
 
-  SECTION("No default value") {
+  SUBCASE("No default value") {
     testClassProperty.defaultProperty.reset();
     PropertyAttributePropertyView<uint16_t> uint16Property =
         view.getPropertyView<uint16_t>(primitive, "TestClassProperty");
@@ -1924,17 +1954,17 @@ TEST_CASE("Test callback for matN PropertyAttributeProperty") {
   MeshPrimitive& primitive = mesh.primitives.emplace_back();
 
   // clang-format off
-  std::vector<glm::umat2x2> data = {
-      glm::umat2x2(
+  std::vector<glm::u16mat2x2> data = {
+      glm::u16mat2x2(
         12, 34,
         30, 1),
-      glm::umat2x2(
+      glm::u16mat2x2(
         11, 8,
         73, 102),
-      glm::umat2x2(
+      glm::u16mat2x2(
         1, 0,
         63, 2),
-      glm::umat2x2(
+      glm::u16mat2x2(
         4, 8,
         3, 23)};
   // clang-format on
@@ -1949,7 +1979,7 @@ TEST_CASE("Test callback for matN PropertyAttributeProperty") {
   Class& testClass = schema.classes["TestClass"];
   ClassProperty& testClassProperty = testClass.properties["TestClassProperty"];
   testClassProperty.type = ClassProperty::Type::MAT2;
-  testClassProperty.componentType = ClassProperty::ComponentType::UINT32;
+  testClassProperty.componentType = ClassProperty::ComponentType::UINT16;
 
   PropertyAttribute& propertyAttribute =
       metadata.propertyAttributes.emplace_back();
@@ -1966,7 +1996,7 @@ TEST_CASE("Test callback for matN PropertyAttributeProperty") {
       view.getClassProperty("TestClassProperty");
   REQUIRE(classProperty);
   REQUIRE(classProperty->type == ClassProperty::Type::MAT2);
-  REQUIRE(classProperty->componentType == ClassProperty::ComponentType::UINT32);
+  REQUIRE(classProperty->componentType == ClassProperty::ComponentType::UINT16);
   REQUIRE(classProperty->count == std::nullopt);
   REQUIRE(!classProperty->array);
   REQUIRE(!classProperty->normalized);
@@ -1980,7 +2010,7 @@ TEST_CASE("Test callback for matN PropertyAttributeProperty") {
           auto propertyValue) mutable {
         invokedCallbackCount++;
         if constexpr (std::is_same_v<
-                          PropertyAttributePropertyView<glm::umat2x2>,
+                          PropertyAttributePropertyView<glm::u16mat2x2>,
                           decltype(propertyValue)>) {
           REQUIRE(
               propertyValue.status() ==
@@ -2005,23 +2035,23 @@ TEST_CASE("Test callback for matN PropertyAttributeProperty (normalized)") {
   MeshPrimitive& primitive = mesh.primitives.emplace_back();
 
   // clang-format off
-  std::vector<glm::umat2x2> data = {
-      glm::umat2x2(
+  std::vector<glm::u16mat2x2> data = {
+      glm::u16mat2x2(
         12, 34,
         30, 1),
-      glm::umat2x2(
+      glm::u16mat2x2(
         11, 8,
         73, 102),
-      glm::umat2x2(
+      glm::u16mat2x2(
         1, 0,
         63, 2),
-      glm::umat2x2(
+      glm::u16mat2x2(
         4, 8,
         3, 23)};
   // clang-format on
 
   const std::string attributeName = "_ATTRIBUTE";
-  addAttributeToModel<glm::umat2x2, true>(
+  addAttributeToModel<glm::u16mat2x2, true>(
       model,
       primitive,
       attributeName,
@@ -2034,7 +2064,7 @@ TEST_CASE("Test callback for matN PropertyAttributeProperty (normalized)") {
   Class& testClass = schema.classes["TestClass"];
   ClassProperty& testClassProperty = testClass.properties["TestClassProperty"];
   testClassProperty.type = ClassProperty::Type::MAT2;
-  testClassProperty.componentType = ClassProperty::ComponentType::UINT32;
+  testClassProperty.componentType = ClassProperty::ComponentType::UINT16;
   testClassProperty.normalized = true;
 
   PropertyAttribute& propertyAttribute =
@@ -2052,7 +2082,7 @@ TEST_CASE("Test callback for matN PropertyAttributeProperty (normalized)") {
       view.getClassProperty("TestClassProperty");
   REQUIRE(classProperty);
   REQUIRE(classProperty->type == ClassProperty::Type::MAT2);
-  REQUIRE(classProperty->componentType == ClassProperty::ComponentType::UINT32);
+  REQUIRE(classProperty->componentType == ClassProperty::ComponentType::UINT16);
   REQUIRE(classProperty->count == std::nullopt);
   REQUIRE(!classProperty->array);
   REQUIRE(classProperty->normalized);
@@ -2066,7 +2096,7 @@ TEST_CASE("Test callback for matN PropertyAttributeProperty (normalized)") {
           auto propertyValue) mutable {
         invokedCallbackCount++;
         if constexpr (std::is_same_v<
-                          PropertyAttributePropertyView<glm::umat2x2, true>,
+                          PropertyAttributePropertyView<glm::u16mat2x2, true>,
                           decltype(propertyValue)>) {
           REQUIRE(
               propertyValue.status() ==

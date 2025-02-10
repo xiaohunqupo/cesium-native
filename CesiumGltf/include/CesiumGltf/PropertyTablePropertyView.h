@@ -1,15 +1,14 @@
 #pragma once
 
-#include "CesiumGltf/PropertyArrayView.h"
-#include "CesiumGltf/PropertyTransformations.h"
-#include "CesiumGltf/PropertyTypeTraits.h"
-#include "CesiumGltf/PropertyView.h"
+#include <CesiumGltf/PropertyArrayView.h>
+#include <CesiumGltf/PropertyTransformations.h>
+#include <CesiumGltf/PropertyTypeTraits.h>
+#include <CesiumGltf/PropertyView.h>
+#include <CesiumUtility/Assert.h>
 
-#include <gsl/span>
-
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
@@ -19,8 +18,7 @@ namespace CesiumGltf {
  *
  * The {@link PropertyTablePropertyView} constructor always completes successfully.
  * However, it may not always reflect the actual content of the
- * {@link PropertyTableProperty}, but instead indicate that its
- * {@link PropertyTablePropertyView::size} is 0.
+ * {@link PropertyTableProperty}, but instead indicate that its `size` is 0.
  * This enumeration provides the reason.
  */
 class PropertyTablePropertyViewStatus : public PropertyViewStatus {
@@ -133,6 +131,10 @@ public:
   static const PropertyViewStatusType ErrorStringOffsetOutOfBounds = 31;
 };
 
+/**
+ * @brief Returns the size in bytes of a \ref PropertyComponentType used as the
+ * `arrayOffsetType` in the constructor of \ref PropertyTablePropertyView.
+ */
 int64_t getOffsetTypeSize(PropertyComponentType offsetType) noexcept;
 
 /**
@@ -148,7 +150,7 @@ class PropertyTablePropertyView;
  *
  * It provides utility to retrieve the actual data stored in the
  * {@link PropertyTableProperty::values} like an array of elements. Data of each
- * instance can be accessed through the {@link PropertyTablePropertyView::get} method.
+ * instance can be accessed through the {@link PropertyTablePropertyView<ElementType, false>::get} method.
  *
  * @param ElementType must be one of the following: a scalar (uint8_t, int8_t,
  * uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t, float, double), a
@@ -189,7 +191,7 @@ public:
         _stringOffsets{},
         _stringOffsetType{PropertyComponentType::None},
         _stringOffsetTypeSize{0} {
-    assert(
+    CESIUM_ASSERT(
         this->_status != PropertyTablePropertyViewStatus::Valid &&
         "An empty property view should not be constructed with a valid status");
   }
@@ -197,8 +199,8 @@ public:
   /**
    * @brief Constructs an instance of an empty property that specifies a default
    * value. Although this property has no data, it can return the default value
-   * when {@link PropertyTablePropertyView::get} is called. However,
-   * {@link PropertyTablePropertyView::getRaw} cannot be used.
+   * when {@link PropertyTablePropertyView<ElementType, false>::get} is called. However,
+   * {@link PropertyTablePropertyView<ElementType, false>::getRaw} cannot be used.
    *
    * @param classProperty The {@link ClassProperty} this property conforms to.
    * @param size The number of elements in the property table specified by {@link PropertyTable::count}
@@ -238,13 +240,13 @@ public:
    * @param property The {@link PropertyTableProperty}
    * @param classProperty The {@link ClassProperty} this property conforms to.
    * @param size The number of elements in the property table specified by {@link PropertyTable::count}
-   * @param value The raw buffer specified by {@link PropertyTableProperty::values}
+   * @param values The raw buffer specified by {@link PropertyTableProperty::values}
    */
   PropertyTablePropertyView(
       const PropertyTableProperty& property,
       const ClassProperty& classProperty,
       int64_t size,
-      gsl::span<const std::byte> values) noexcept
+      std::span<const std::byte> values) noexcept
       : PropertyView<ElementType>(classProperty, property),
         _values{values},
         _size{
@@ -272,9 +274,9 @@ public:
       const PropertyTableProperty& property,
       const ClassProperty& classProperty,
       int64_t size,
-      gsl::span<const std::byte> values,
-      gsl::span<const std::byte> arrayOffsets,
-      gsl::span<const std::byte> stringOffsets,
+      std::span<const std::byte> values,
+      std::span<const std::byte> arrayOffsets,
+      std::span<const std::byte> stringOffsets,
       PropertyComponentType arrayOffsetType,
       PropertyComponentType stringOffsetType) noexcept
       : PropertyView<ElementType>(classProperty, property),
@@ -303,30 +305,27 @@ public:
    * @return The value of the element, or std::nullopt if it matches the "no
    * data" value
    */
-  std::optional<ElementType> get(int64_t index) const noexcept {
+  std::optional<PropertyValueViewToCopy<ElementType>>
+  get(int64_t index) const noexcept {
     if (this->_status ==
         PropertyTablePropertyViewStatus::EmptyPropertyWithDefault) {
-      assert(index >= 0 && "index must be non-negative");
-      assert(index < size() && "index must be less than size");
+      CESIUM_ASSERT(index >= 0 && "index must be non-negative");
+      CESIUM_ASSERT(index < size() && "index must be less than size");
 
-      return this->defaultValue();
+      return propertyValueViewToCopy(this->defaultValue());
     }
 
     ElementType value = getRaw(index);
 
     if (value == this->noData()) {
-      return this->defaultValue();
+      return propertyValueViewToCopy(this->defaultValue());
+    } else if constexpr (IsMetadataNumeric<ElementType>::value) {
+      return transformValue(value, this->offset(), this->scale());
+    } else if constexpr (IsMetadataNumericArray<ElementType>::value) {
+      return transformArray(value, this->offset(), this->scale());
+    } else {
+      return value;
     }
-
-    if constexpr (IsMetadataNumeric<ElementType>::value) {
-      value = transformValue(value, this->offset(), this->scale());
-    }
-
-    if constexpr (IsMetadataNumericArray<ElementType>::value) {
-      value = transformArray(value, this->offset(), this->scale());
-    }
-
-    return value;
   }
 
   /**
@@ -340,14 +339,14 @@ public:
    * @return The value of the element
    */
   ElementType getRaw(int64_t index) const noexcept {
-    assert(
+    CESIUM_ASSERT(
         this->_status == PropertyTablePropertyViewStatus::Valid &&
         "Check the status() first to make sure view is valid");
-    assert(
+    CESIUM_ASSERT(
         size() > 0 &&
         "Check the size() of the view to make sure it's not empty");
-    assert(index >= 0 && "index must be non-negative");
-    assert(index < size() && "index must be less than size");
+    CESIUM_ASSERT(index >= 0 && "index must be non-negative");
+    CESIUM_ASSERT(index < size() && "index must be less than size");
 
     if constexpr (IsMetadataNumeric<ElementType>::value) {
       return getNumericValue(index);
@@ -414,18 +413,21 @@ private:
     // Handle fixed-length arrays
     if (count > 0) {
       size_t arraySize = count * sizeof(T);
-      const gsl::span<const std::byte> values(
+      const std::span<const std::byte> values(
           _values.data() + index * arraySize,
           arraySize);
       return PropertyArrayView<T>{values};
     }
 
-    // Handle variable-length arrays
+    // Handle variable-length arrays. The offsets are interpreted as array
+    // indices, not byte offsets, so they must be multiplied by sizeof(T)
     const size_t currentOffset =
-        getOffsetFromOffsetsBuffer(index, _arrayOffsets, _arrayOffsetType);
+        getOffsetFromOffsetsBuffer(index, _arrayOffsets, _arrayOffsetType) *
+        sizeof(T);
     const size_t nextOffset =
-        getOffsetFromOffsetsBuffer(index + 1, _arrayOffsets, _arrayOffsetType);
-    const gsl::span<const std::byte> values(
+        getOffsetFromOffsetsBuffer(index + 1, _arrayOffsets, _arrayOffsetType) *
+        sizeof(T);
+    const std::span<const std::byte> values(
         _values.data() + currentOffset,
         nextOffset - currentOffset);
     return PropertyArrayView<T>{values};
@@ -438,7 +440,7 @@ private:
     if (count > 0) {
       // Copy the corresponding string offsets to pass to the PropertyArrayView.
       const size_t arraySize = count * _stringOffsetTypeSize;
-      const gsl::span<const std::byte> stringOffsetValues(
+      const std::span<const std::byte> stringOffsetValues(
           _stringOffsets.data() + index * arraySize,
           arraySize + _stringOffsetTypeSize);
       return PropertyArrayView<std::string_view>(
@@ -454,7 +456,7 @@ private:
     const size_t nextArrayOffset =
         getOffsetFromOffsetsBuffer(index + 1, _arrayOffsets, _arrayOffsetType);
     const size_t arraySize = nextArrayOffset - currentArrayOffset;
-    const gsl::span<const std::byte> stringOffsetValues(
+    const std::span<const std::byte> stringOffsetValues(
         _stringOffsets.data() + currentArrayOffset,
         arraySize + _arrayOffsetTypeSize);
     return PropertyArrayView<std::string_view>(
@@ -470,7 +472,7 @@ private:
     if (count > 0) {
       const size_t offsetBits = count * index;
       const size_t nextOffsetBits = count * (index + 1);
-      const gsl::span<const std::byte> buffer(
+      const std::span<const std::byte> buffer(
           _values.data() + offsetBits / 8,
           (nextOffsetBits / 8 - offsetBits / 8 + 1));
       return PropertyArrayView<bool>(buffer, offsetBits % 8, count);
@@ -482,20 +484,20 @@ private:
     const size_t nextOffset =
         getOffsetFromOffsetsBuffer(index + 1, _arrayOffsets, _arrayOffsetType);
     const size_t totalBits = nextOffset - currentOffset;
-    const gsl::span<const std::byte> buffer(
+    const std::span<const std::byte> buffer(
         _values.data() + currentOffset / 8,
         (nextOffset / 8 - currentOffset / 8 + 1));
     return PropertyArrayView<bool>(buffer, currentOffset % 8, totalBits);
   }
 
-  gsl::span<const std::byte> _values;
+  std::span<const std::byte> _values;
   int64_t _size;
 
-  gsl::span<const std::byte> _arrayOffsets;
+  std::span<const std::byte> _arrayOffsets;
   PropertyComponentType _arrayOffsetType;
   int64_t _arrayOffsetTypeSize;
 
-  gsl::span<const std::byte> _stringOffsets;
+  std::span<const std::byte> _stringOffsets;
   PropertyComponentType _stringOffsetType;
   int64_t _stringOffsetTypeSize;
 };
@@ -506,7 +508,7 @@ private:
  *
  * It provides utility to retrieve the actual data stored in the
  * {@link PropertyTableProperty::values} like an array of elements. Data of each
- * instance can be accessed through the {@link PropertyTablePropertyView::get} method.
+ * instance can be accessed through the \ref get method.
  *
  * @param ElementType must be one of the following: an integer scalar (uint8_t,
  * int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t), a glm vecN
@@ -544,7 +546,7 @@ public:
         _arrayOffsets{},
         _arrayOffsetType{PropertyComponentType::None},
         _arrayOffsetTypeSize{0} {
-    assert(
+    CESIUM_ASSERT(
         this->_status != PropertyTablePropertyViewStatus::Valid &&
         "An empty property view should not be constructed with a valid status");
   }
@@ -552,8 +554,8 @@ public:
   /**
    * @brief Constructs an instance of an empty property that specifies a default
    * value. Although this property has no data, it can return the default value
-   * when {@link PropertyTablePropertyView::get} is called. However,
-   * {@link PropertyTablePropertyView::getRaw} cannot be used.
+   * when {@link PropertyTablePropertyView<ElementType, true>::get} is called. However,
+   * {@link PropertyTablePropertyView<ElementType, true>::getRaw} cannot be used.
    *
    * @param classProperty The {@link ClassProperty} this property conforms to.
    * @param size The number of elements in the property table specified by {@link PropertyTable::count}
@@ -590,13 +592,13 @@ public:
    * @param property The {@link PropertyTableProperty}
    * @param classProperty The {@link ClassProperty} this property conforms to.
    * @param size The number of elements in the property table specified by {@link PropertyTable::count}
-   * @param value The raw buffer specified by {@link PropertyTableProperty::values}
+   * @param values The raw buffer specified by {@link PropertyTableProperty::values}
    */
   PropertyTablePropertyView(
       const PropertyTableProperty& property,
       const ClassProperty& classProperty,
       int64_t size,
-      gsl::span<const std::byte> values) noexcept
+      std::span<const std::byte> values) noexcept
       : PropertyView<ElementType, true>(classProperty, property),
         _values{values},
         _size{
@@ -614,14 +616,14 @@ public:
    * @param size The number of elements in the property table specified by {@link PropertyTable::count}
    * @param values The raw buffer specified by {@link PropertyTableProperty::values}
    * @param arrayOffsets The raw buffer specified by {@link PropertyTableProperty::arrayOffsets}
-   * @param offsetType The offset type of arrayOffsets specified by {@link PropertyTableProperty::arrayOffsetType}
+   * @param arrayOffsetType The offset type of arrayOffsets specified by {@link PropertyTableProperty::arrayOffsetType}
    */
   PropertyTablePropertyView(
       const PropertyTableProperty& property,
       const ClassProperty& classProperty,
       int64_t size,
-      gsl::span<const std::byte> values,
-      gsl::span<const std::byte> arrayOffsets,
+      std::span<const std::byte> values,
+      std::span<const std::byte> arrayOffsets,
       PropertyComponentType arrayOffsetType) noexcept
       : PropertyView<ElementType, true>(classProperty, property),
         _values{values},
@@ -646,28 +648,25 @@ public:
    * @return The value of the element, or std::nullopt if it matches the "no
    * data" value
    */
-  std::optional<NormalizedType> get(int64_t index) const noexcept {
+  std::optional<PropertyValueViewToCopy<NormalizedType>>
+  get(int64_t index) const noexcept {
     if (this->_status ==
         PropertyTablePropertyViewStatus::EmptyPropertyWithDefault) {
-      assert(index >= 0 && "index must be non-negative");
-      assert(index < size() && "index must be less than size");
+      CESIUM_ASSERT(index >= 0 && "index must be non-negative");
+      CESIUM_ASSERT(index < size() && "index must be less than size");
 
-      return this->defaultValue();
+      return propertyValueViewToCopy(this->defaultValue());
     }
 
     ElementType value = getRaw(index);
     if (this->noData() && value == *(this->noData())) {
-      return this->defaultValue();
-    }
-
-    if constexpr (IsMetadataScalar<ElementType>::value) {
+      return propertyValueViewToCopy(this->defaultValue());
+    } else if constexpr (IsMetadataScalar<ElementType>::value) {
       return transformValue<NormalizedType>(
           normalize<ElementType>(value),
           this->offset(),
           this->scale());
-    }
-
-    if constexpr (IsMetadataVecN<ElementType>::value) {
+    } else if constexpr (IsMetadataVecN<ElementType>::value) {
       constexpr glm::length_t N = ElementType::length();
       using T = typename ElementType::value_type;
       using NormalizedT = typename NormalizedType::value_type;
@@ -675,9 +674,7 @@ public:
           normalize<N, T>(value),
           this->offset(),
           this->scale());
-    }
-
-    if constexpr (IsMetadataMatN<ElementType>::value) {
+    } else if constexpr (IsMetadataMatN<ElementType>::value) {
       constexpr glm::length_t N = ElementType::length();
       using T = typename ElementType::value_type;
       using NormalizedT = typename NormalizedType::value_type;
@@ -685,27 +682,21 @@ public:
           normalize<N, T>(value),
           this->offset(),
           this->scale());
-    }
-
-    if constexpr (IsMetadataArray<ElementType>::value) {
+    } else if constexpr (IsMetadataArray<ElementType>::value) {
       using ArrayElementType = typename MetadataArrayType<ElementType>::type;
       if constexpr (IsMetadataScalar<ArrayElementType>::value) {
         return transformNormalizedArray<ArrayElementType>(
             value,
             this->offset(),
             this->scale());
-      }
-
-      if constexpr (IsMetadataVecN<ArrayElementType>::value) {
+      } else if constexpr (IsMetadataVecN<ArrayElementType>::value) {
         constexpr glm::length_t N = ArrayElementType::length();
         using T = typename ArrayElementType::value_type;
         return transformNormalizedVecNArray<N, T>(
             value,
             this->offset(),
             this->scale());
-      }
-
-      if constexpr (IsMetadataMatN<ArrayElementType>::value) {
+      } else if constexpr (IsMetadataMatN<ArrayElementType>::value) {
         constexpr glm::length_t N = ArrayElementType::length();
         using T = typename ArrayElementType::value_type;
         return transformNormalizedMatNArray<N, T>(
@@ -727,14 +718,14 @@ public:
    * @return The value of the element
    */
   ElementType getRaw(int64_t index) const noexcept {
-    assert(
+    CESIUM_ASSERT(
         this->_status == PropertyTablePropertyViewStatus::Valid &&
         "Check the status() first to make sure view is valid");
-    assert(
+    CESIUM_ASSERT(
         size() > 0 &&
         "Check the size() of the view to make sure it's not empty");
-    assert(index >= 0 && "index must be non-negative");
-    assert(index < size() && "index must be less than size");
+    CESIUM_ASSERT(index >= 0 && "index must be non-negative");
+    CESIUM_ASSERT(index < size() && "index must be less than size");
 
     if constexpr (IsMetadataNumeric<ElementType>::value) {
       return getValue(index);
@@ -768,27 +759,30 @@ private:
     // Handle fixed-length arrays
     if (count > 0) {
       size_t arraySize = count * sizeof(T);
-      const gsl::span<const std::byte> values(
+      const std::span<const std::byte> values(
           _values.data() + index * arraySize,
           arraySize);
       return PropertyArrayView<T>{values};
     }
 
-    // Handle variable-length arrays
+    // Handle variable-length arrays. The offsets are interpreted as array
+    // indices, not byte offsets, so they must be multiplied by sizeof(T)
     const size_t currentOffset =
-        getOffsetFromOffsetsBuffer(index, _arrayOffsets, _arrayOffsetType);
+        getOffsetFromOffsetsBuffer(index, _arrayOffsets, _arrayOffsetType) *
+        sizeof(T);
     const size_t nextOffset =
-        getOffsetFromOffsetsBuffer(index + 1, _arrayOffsets, _arrayOffsetType);
-    const gsl::span<const std::byte> values(
+        getOffsetFromOffsetsBuffer(index + 1, _arrayOffsets, _arrayOffsetType) *
+        sizeof(T);
+    const std::span<const std::byte> values(
         _values.data() + currentOffset,
         nextOffset - currentOffset);
     return PropertyArrayView<T>{values};
   }
 
-  gsl::span<const std::byte> _values;
+  std::span<const std::byte> _values;
   int64_t _size;
 
-  gsl::span<const std::byte> _arrayOffsets;
+  std::span<const std::byte> _arrayOffsets;
   PropertyComponentType _arrayOffsetType;
   int64_t _arrayOffsetTypeSize;
 };

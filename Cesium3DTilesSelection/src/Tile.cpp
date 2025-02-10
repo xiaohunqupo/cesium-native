@@ -1,14 +1,20 @@
-#include "Cesium3DTilesSelection/Tile.h"
-
-#include <CesiumGeometry/Axis.h>
-#include <CesiumGeometry/Rectangle.h>
-#include <CesiumGeometry/Transforms.h>
-#include <CesiumGeospatial/GlobeTransforms.h>
+#include <Cesium3DTilesSelection/RasterMappedTo3DTile.h>
+#include <Cesium3DTilesSelection/Tile.h>
+#include <Cesium3DTilesSelection/TileContent.h>
+#include <Cesium3DTilesSelection/TileRefine.h>
+#include <CesiumGltf/Buffer.h>
+#include <CesiumGltf/BufferView.h>
+#include <CesiumGltf/Image.h>
 #include <CesiumGltf/Model.h>
-#include <CesiumUtility/JsonHelpers.h>
-#include <CesiumUtility/Tracing.h>
+#include <CesiumUtility/Math.h>
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <stdexcept>
+#include <utility>
+#include <vector>
 
 using namespace CesiumGeometry;
 using namespace CesiumGeospatial;
@@ -57,7 +63,7 @@ Tile::Tile(
       _content{std::forward<TileContentArgs>(args)...},
       _pLoader{pLoader},
       _loadState{loadState},
-      _shouldContentContinueUpdating{true} {}
+      _mightHaveLatentChildren{true} {}
 
 Tile::Tile(Tile&& rhs) noexcept
     : _pParent(rhs._pParent),
@@ -74,7 +80,7 @@ Tile::Tile(Tile&& rhs) noexcept
       _content(std::move(rhs._content)),
       _pLoader{rhs._pLoader},
       _loadState{rhs._loadState},
-      _shouldContentContinueUpdating{rhs._shouldContentContinueUpdating} {
+      _mightHaveLatentChildren{rhs._mightHaveLatentChildren} {
   // since children of rhs will have the parent pointed to rhs,
   // we will reparent them to this tile as rhs will be destroyed after this
   for (Tile& tile : this->_children) {
@@ -105,7 +111,7 @@ Tile& Tile::operator=(Tile&& rhs) noexcept {
     this->_content = std::move(rhs._content);
     this->_pLoader = rhs._pLoader;
     this->_loadState = rhs._loadState;
-    this->_shouldContentContinueUpdating = rhs._shouldContentContinueUpdating;
+    this->_mightHaveLatentChildren = rhs._mightHaveLatentChildren;
   }
 
   return *this;
@@ -173,7 +179,11 @@ int64_t Tile::computeByteSize() const noexcept {
         bytes -= bufferViews[size_t(bufferView)].byteLength;
       }
 
-      bytes += int64_t(image.cesium.pixelData.size());
+      // sizeBytes is set in TilesetContentManager::ContentKindSetter, if not
+      // sooner (e.g., by the renderer implementation).
+      if (image.pAsset) {
+        bytes += image.pAsset->sizeBytes;
+      }
     }
   }
 
@@ -225,12 +235,12 @@ void Tile::setParent(Tile* pParent) noexcept { this->_pParent = pParent; }
 
 void Tile::setState(TileLoadState state) noexcept { this->_loadState = state; }
 
-bool Tile::shouldContentContinueUpdating() const noexcept {
-  return this->_shouldContentContinueUpdating;
+bool Tile::getMightHaveLatentChildren() const noexcept {
+  return this->_mightHaveLatentChildren;
 }
 
-void Tile::setContentShouldContinueUpdating(
-    bool shouldContentContinueUpdating) noexcept {
-  this->_shouldContentContinueUpdating = shouldContentContinueUpdating;
+void Tile::setMightHaveLatentChildren(bool mightHaveLatentChildren) noexcept {
+  this->_mightHaveLatentChildren = mightHaveLatentChildren;
 }
+
 } // namespace Cesium3DTilesSelection
