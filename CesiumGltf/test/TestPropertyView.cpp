@@ -1,12 +1,34 @@
-#include "CesiumGltf/PropertyView.h"
+#include <CesiumGltf/ClassProperty.h>
+#include <CesiumGltf/PropertyArrayView.h>
+#include <CesiumGltf/PropertyView.h>
+#include <CesiumUtility/JsonValue.h>
 
-#include <catch2/catch.hpp>
+#include <doctest/doctest.h>
+#include <glm/ext/matrix_double2x2.hpp>
+#include <glm/ext/matrix_double3x3.hpp>
+#include <glm/ext/matrix_float2x2.hpp>
+#include <glm/ext/matrix_float3x3.hpp>
+#include <glm/ext/vector_double2.hpp>
+#include <glm/ext/vector_float2.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_float4.hpp>
+#include <glm/ext/vector_int2.hpp>
+#include <glm/ext/vector_int2_sized.hpp>
+#include <glm/ext/vector_int3.hpp>
+#include <glm/ext/vector_int3_sized.hpp>
+#include <glm/ext/vector_int4_sized.hpp>
+#include <glm/ext/vector_uint3_sized.hpp>
+#include <glm/fwd.hpp>
+
+#include <cstdint>
+#include <ostream>
+#include <string_view>
 
 using namespace CesiumGltf;
 using namespace CesiumUtility;
 
 TEST_CASE("Boolean PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<bool> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -20,7 +42,7 @@ TEST_CASE("Boolean PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
 
@@ -28,7 +50,7 @@ TEST_CASE("Boolean PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.array = true;
@@ -37,7 +59,7 @@ TEST_CASE("Boolean PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Constructs with defaultProperty") {
+  SUBCASE("Constructs with defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.required = false;
@@ -50,7 +72,7 @@ TEST_CASE("Boolean PropertyView") {
     ;
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.required = true;
@@ -60,7 +82,7 @@ TEST_CASE("Boolean PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidDefaultValue);
   }
 
-  SECTION("Reports default value invalid type") {
+  SUBCASE("Reports default value invalid type") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.defaultProperty = 1;
@@ -71,7 +93,7 @@ TEST_CASE("Boolean PropertyView") {
 }
 
 TEST_CASE("Scalar PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<uint8_t> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -85,7 +107,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
 
@@ -93,7 +115,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -102,7 +124,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -112,7 +134,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -122,7 +144,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -139,7 +161,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(view.min() == -10.5f);
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -154,7 +176,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(view.defaultValue() == 1);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -177,7 +199,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -199,7 +221,7 @@ TEST_CASE("Scalar PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidMax);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -223,7 +245,7 @@ TEST_CASE("Scalar PropertyView") {
 }
 
 TEST_CASE("Scalar PropertyView (normalized)") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<uint8_t, true> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -237,7 +259,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
 
@@ -245,7 +267,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -254,7 +276,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -264,7 +286,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -274,7 +296,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -292,7 +314,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(view.min() == -10.5f);
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -308,7 +330,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(view.defaultValue() == 1.5);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -324,7 +346,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -335,7 +357,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -360,7 +382,7 @@ TEST_CASE("Scalar PropertyView (normalized)") {
 }
 
 TEST_CASE("VecN PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<glm::vec3> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -374,7 +396,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
 
@@ -382,7 +404,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -391,7 +413,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -401,7 +423,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -411,7 +433,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -428,7 +450,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(view.min() == glm::vec3(-11, -12, -13));
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC4;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -442,7 +464,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(view.defaultValue() == glm::vec4(1.0f, 2.0f, 3.0f, 4.0f));
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -465,7 +487,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -487,7 +509,7 @@ TEST_CASE("VecN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidMax);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -519,7 +541,7 @@ TEST_CASE("VecN PropertyView") {
 }
 
 TEST_CASE("VecN PropertyView (normalized)") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<glm::i8vec2, true> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -533,7 +555,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
 
@@ -541,7 +563,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -550,7 +572,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -560,7 +582,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -570,7 +592,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -588,7 +610,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(view.min() == glm::dvec3(-11, -12, -13));
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC4;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -604,7 +626,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(view.defaultValue() == glm::dvec4(1.0, 2.0, 3.0, 4.5));
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -620,7 +642,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -632,7 +654,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -665,7 +687,7 @@ TEST_CASE("VecN PropertyView (normalized)") {
 }
 
 TEST_CASE("MatN PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<glm::mat2> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -679,7 +701,7 @@ TEST_CASE("MatN PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT4;
 
@@ -687,7 +709,7 @@ TEST_CASE("MatN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -696,7 +718,7 @@ TEST_CASE("MatN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -706,7 +728,7 @@ TEST_CASE("MatN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -716,7 +738,7 @@ TEST_CASE("MatN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT3;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -769,7 +791,7 @@ TEST_CASE("MatN PropertyView") {
     // clang-format on
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -799,7 +821,7 @@ TEST_CASE("MatN PropertyView") {
     REQUIRE(view.defaultValue() == expectedDefaultValue);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -838,7 +860,7 @@ TEST_CASE("MatN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -891,7 +913,7 @@ TEST_CASE("MatN PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -931,7 +953,7 @@ TEST_CASE("MatN PropertyView") {
 }
 
 TEST_CASE("MatN PropertyView (normalized)") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<glm::imat2x2, true> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -945,7 +967,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT4;
 
@@ -953,7 +975,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -962,7 +984,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -972,7 +994,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -982,7 +1004,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -1035,7 +1057,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     // clang-format on
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -1064,7 +1086,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     REQUIRE(view.defaultValue() == expectedDefaultValue);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -1088,7 +1110,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -1103,7 +1125,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -1146,7 +1168,7 @@ TEST_CASE("MatN PropertyView (normalized)") {
 }
 
 TEST_CASE("String PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<std::string_view> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -1160,7 +1182,7 @@ TEST_CASE("String PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
 
@@ -1168,7 +1190,7 @@ TEST_CASE("String PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = true;
@@ -1177,7 +1199,7 @@ TEST_CASE("String PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.required = false;
@@ -1192,7 +1214,7 @@ TEST_CASE("String PropertyView") {
     REQUIRE(view.defaultValue() == "default");
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.required = true;
@@ -1206,7 +1228,7 @@ TEST_CASE("String PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.defaultProperty = true;
@@ -1221,7 +1243,7 @@ TEST_CASE("String PropertyView") {
 }
 
 TEST_CASE("Boolean Array PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<PropertyArrayView<bool>> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -1235,7 +1257,7 @@ TEST_CASE("Boolean Array PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = true;
@@ -1244,7 +1266,7 @@ TEST_CASE("Boolean Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.array = false;
@@ -1253,7 +1275,7 @@ TEST_CASE("Boolean Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Constructs with count") {
+  SUBCASE("Constructs with count") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.array = true;
@@ -1264,7 +1286,7 @@ TEST_CASE("Boolean Array PropertyView") {
     REQUIRE(view.arrayCount() == 5);
   }
 
-  SECTION("Constructs with defaultProperty") {
+  SUBCASE("Constructs with defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.array = true;
@@ -1282,7 +1304,7 @@ TEST_CASE("Boolean Array PropertyView") {
     REQUIRE(defaultValue[1]);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.array = true;
@@ -1293,7 +1315,7 @@ TEST_CASE("Boolean Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidDefaultValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.array = true;
@@ -1305,7 +1327,7 @@ TEST_CASE("Boolean Array PropertyView") {
 }
 
 TEST_CASE("Scalar Array PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<PropertyArrayView<uint8_t>> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -1319,7 +1341,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = true;
@@ -1328,7 +1350,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -1338,7 +1360,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1348,7 +1370,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -1359,7 +1381,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with count") {
+  SUBCASE("Constructs with count") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1371,7 +1393,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(view.arrayCount() == *classProperty.count);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -1410,7 +1432,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(value[1] == -1.0f);
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1437,7 +1459,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(value[1] == 3);
   }
 
-  SECTION("Reports errors for defined properties on variable-length arrays") {
+  SUBCASE("Reports errors for defined properties on variable-length arrays") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -1461,7 +1483,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1486,7 +1508,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1518,7 +1540,7 @@ TEST_CASE("Scalar Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1552,7 +1574,7 @@ TEST_CASE("Scalar Array PropertyView") {
 }
 
 TEST_CASE("Scalar Array PropertyView (normalized)") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<PropertyArrayView<uint8_t>, true> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -1566,7 +1588,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = true;
@@ -1575,7 +1597,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -1585,7 +1607,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1595,7 +1617,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -1606,7 +1628,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with count") {
+  SUBCASE("Constructs with count") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1619,7 +1641,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(view.arrayCount() == *classProperty.count);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::INT16;
@@ -1659,7 +1681,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(value[1] == -1.0);
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1686,7 +1708,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(defaultValue[1] == 3.5);
   }
 
-  SECTION("Reports errors for defined properties on variable-length arrays") {
+  SUBCASE("Reports errors for defined properties on variable-length arrays") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1712,7 +1734,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1730,7 +1752,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1743,7 +1765,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::SCALAR;
     classProperty.componentType = ClassProperty::ComponentType::UINT8;
@@ -1779,7 +1801,7 @@ TEST_CASE("Scalar Array PropertyView (normalized)") {
 }
 
 TEST_CASE("VecN Array PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<PropertyArrayView<glm::vec3>> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -1793,7 +1815,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.array = true;
@@ -1802,7 +1824,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -1812,7 +1834,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -1822,7 +1844,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -1833,7 +1855,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with count") {
+  SUBCASE("Constructs with count") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT16;
@@ -1845,7 +1867,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(view.arrayCount() == classProperty.count);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -1884,7 +1906,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(value[1] == glm::vec3(-2, -4, 6));
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -1910,7 +1932,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(value[1] == glm::vec2(5.0f, 6.0f));
   }
 
-  SECTION("Reports errors for defined properties on variable-length arrays") {
+  SUBCASE("Reports errors for defined properties on variable-length arrays") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -1934,7 +1956,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -1958,7 +1980,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -1989,7 +2011,7 @@ TEST_CASE("VecN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2022,7 +2044,7 @@ TEST_CASE("VecN Array PropertyView") {
 }
 
 TEST_CASE("VecN Array PropertyView (normalized)") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<PropertyArrayView<glm::ivec2>, true> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -2036,7 +2058,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.array = true;
@@ -2045,7 +2067,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2055,7 +2077,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2065,7 +2087,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2076,7 +2098,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with count") {
+  SUBCASE("Constructs with count") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2089,7 +2111,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(view.arrayCount() == classProperty.count);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2129,7 +2151,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(value[1] == glm::dvec3(-2, -4, 6));
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2156,7 +2178,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(defaultValue[1] == glm::dvec2(5.0, 6.0));
   }
 
-  SECTION("Reports errors for defined properties on variable-length arrays") {
+  SUBCASE("Reports errors for defined properties on variable-length arrays") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2181,7 +2203,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2199,7 +2221,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2211,7 +2233,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::VEC2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2245,7 +2267,7 @@ TEST_CASE("VecN Array PropertyView (normalized)") {
 }
 
 TEST_CASE("MatN Array PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<PropertyArrayView<glm::mat2>> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -2259,7 +2281,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT4;
     classProperty.array = true;
@@ -2268,7 +2290,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2278,7 +2300,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -2288,7 +2310,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -2299,7 +2321,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with count") {
+  SUBCASE("Constructs with count") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2311,7 +2333,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(view.arrayCount() == classProperty.count);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -2372,7 +2394,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(value[1] == glm::mat2(0, 1, 2, 3));
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2411,7 +2433,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(value[1] == glm::i8mat2x2(2, 2, 2, 2));
   }
 
-  SECTION("Reports errors for defined properties on variable-length arrays") {
+  SUBCASE("Reports errors for defined properties on variable-length arrays") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::FLOAT32;
@@ -2462,7 +2484,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2515,7 +2537,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2587,7 +2609,7 @@ TEST_CASE("MatN Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2626,7 +2648,7 @@ TEST_CASE("MatN Array PropertyView") {
 }
 
 TEST_CASE("MatN Array PropertyView (normalized)") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<PropertyArrayView<glm::imat2x2>, true> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -2640,7 +2662,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT4;
     classProperty.array = true;
@@ -2649,7 +2671,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports component type mismatch") {
+  SUBCASE("Reports component type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2659,7 +2681,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorComponentTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2669,7 +2691,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Reports invalid normalization") {
+  SUBCASE("Reports invalid normalization") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2680,7 +2702,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorNormalizationMismatch);
   }
 
-  SECTION("Constructs with count") {
+  SUBCASE("Constructs with count") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT3;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2693,7 +2715,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(view.arrayCount() == classProperty.count);
   }
 
-  SECTION("Constructs with offset, scale, max, and min") {
+  SUBCASE("Constructs with offset, scale, max, and min") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2756,7 +2778,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(value[1] == glm::dmat2(0, 1, 2, 3));
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2795,7 +2817,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(defaultValue[0] == glm::dmat2(1, 1, 1, 1));
     REQUIRE(defaultValue[1] == glm::dmat2(2, 2, 2, 2));
   }
-  SECTION("Reports errors for defined properties on variable-length arrays") {
+  SUBCASE("Reports errors for defined properties on variable-length arrays") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2847,7 +2869,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     view = PropertyView<PropertyArrayView<glm::imat2x2>, true>(classProperty);
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidOffset);
   }
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT32;
@@ -2880,7 +2902,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     ;
   }
 
-  SECTION("Reports errors for out-of-bounds values") {
+  SUBCASE("Reports errors for out-of-bounds values") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2899,7 +2921,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::MAT2;
     classProperty.componentType = ClassProperty::ComponentType::INT8;
@@ -2939,7 +2961,7 @@ TEST_CASE("MatN Array PropertyView (normalized)") {
 }
 
 TEST_CASE("String Array PropertyView") {
-  SECTION("Constructs empty PropertyView") {
+  SUBCASE("Constructs empty PropertyView") {
     PropertyView<PropertyArrayView<std::string_view>> view;
     REQUIRE(view.status() == PropertyViewStatus::ErrorNonexistentProperty);
     REQUIRE(view.arrayCount() == 0);
@@ -2953,7 +2975,7 @@ TEST_CASE("String Array PropertyView") {
     REQUIRE(!view.defaultValue());
   }
 
-  SECTION("Reports type mismatch") {
+  SUBCASE("Reports type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::BOOLEAN;
     classProperty.array = true;
@@ -2962,7 +2984,7 @@ TEST_CASE("String Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorTypeMismatch);
   }
 
-  SECTION("Reports array type mismatch") {
+  SUBCASE("Reports array type mismatch") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = false;
@@ -2971,7 +2993,7 @@ TEST_CASE("String Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorArrayTypeMismatch);
   }
 
-  SECTION("Constructs with count") {
+  SUBCASE("Constructs with count") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = true;
@@ -2982,7 +3004,7 @@ TEST_CASE("String Array PropertyView") {
     REQUIRE(view.arrayCount() == classProperty.count);
   }
 
-  SECTION("Constructs with noData and defaultProperty") {
+  SUBCASE("Constructs with noData and defaultProperty") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = true;
@@ -3007,7 +3029,7 @@ TEST_CASE("String Array PropertyView") {
     REQUIRE(defaultValue[1] == "default2");
   }
 
-  SECTION("Reports errors for incorrectly defined properties") {
+  SUBCASE("Reports errors for incorrectly defined properties") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = true;
@@ -3022,7 +3044,7 @@ TEST_CASE("String Array PropertyView") {
     REQUIRE(view.status() == PropertyViewStatus::ErrorInvalidNoDataValue);
   }
 
-  SECTION("Reports errors for invalid types") {
+  SUBCASE("Reports errors for invalid types") {
     ClassProperty classProperty;
     classProperty.type = ClassProperty::Type::STRING;
     classProperty.array = true;

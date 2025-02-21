@@ -1,4 +1,14 @@
 #include <Cesium3DTilesSelection/TileContent.h>
+#include <CesiumGltf/Model.h>
+#include <CesiumUtility/CreditSystem.h>
+
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
+using namespace CesiumRasterOverlays;
+using namespace CesiumUtility;
 
 namespace Cesium3DTilesSelection {
 TileRenderContent::TileRenderContent(CesiumGltf::Model&& model)

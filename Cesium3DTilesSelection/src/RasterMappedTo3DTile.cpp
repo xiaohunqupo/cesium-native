@@ -1,17 +1,31 @@
-#include "TileUtilities.h"
-
+#include <Cesium3DTilesSelection/BoundingVolume.h>
 #include <Cesium3DTilesSelection/IPrepareRendererResources.h>
 #include <Cesium3DTilesSelection/RasterMappedTo3DTile.h>
-#include <Cesium3DTilesSelection/RasterOverlayCollection.h>
-#include <Cesium3DTilesSelection/RasterOverlayTileProvider.h>
 #include <Cesium3DTilesSelection/Tile.h>
 #include <Cesium3DTilesSelection/TileContent.h>
-#include <Cesium3DTilesSelection/Tileset.h>
 #include <Cesium3DTilesSelection/TilesetExternals.h>
+#include <CesiumGeospatial/BoundingRegion.h>
+#include <CesiumGeospatial/Ellipsoid.h>
+#include <CesiumGeospatial/Projection.h>
+#include <CesiumRasterOverlays/RasterOverlayDetails.h>
+#include <CesiumRasterOverlays/RasterOverlayTileProvider.h>
+#include <CesiumRasterOverlays/RasterOverlayUtilities.h>
+#include <CesiumUtility/Assert.h>
+#include <CesiumUtility/IntrusivePointer.h>
+#include <CesiumUtility/Tracing.h>
 
+#include <glm/ext/vector_double4.hpp>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <vector>
+
+using namespace Cesium3DTilesSelection;
 using namespace CesiumGeometry;
 using namespace CesiumGeospatial;
-using namespace Cesium3DTilesSelection;
+using namespace CesiumRasterOverlays;
 using namespace CesiumUtility;
 
 namespace {
@@ -57,13 +71,13 @@ RasterMappedTo3DTile::RasterMappedTo3DTile(
       _scale(1.0, 1.0),
       _state(AttachmentState::Unattached),
       _originalFailed(false) {
-  assert(this->_pLoadingTile != nullptr);
+  CESIUM_ASSERT(this->_pLoadingTile != nullptr);
 }
 
 RasterOverlayTile::MoreDetailAvailable RasterMappedTo3DTile::update(
     IPrepareRendererResources& prepareRendererResources,
     Tile& tile) {
-  assert(this->_pLoadingTile != nullptr || this->_pReadyTile != nullptr);
+  CESIUM_ASSERT(this->_pLoadingTile != nullptr || this->_pReadyTile != nullptr);
 
   if (this->getState() == AttachmentState::Attached) {
     return !this->_originalFailed && this->_pReadyTile &&
@@ -80,8 +94,10 @@ RasterOverlayTile::MoreDetailAvailable RasterMappedTo3DTile::update(
              RasterOverlayTile::LoadState::Failed &&
          pTile) {
     // Note when our original tile fails to load so that we don't report more
-    // data available. This means - by design - we won't refine past a failed
-    // tile.
+    // data available. This means - by design - we won't upsample for a failed
+    // raster overlay tile. However, each real (non-upsampled) geometry tile
+    // will have raster overlay images mapped to it, even if the parent geometry
+    // tile's images already failed to load.
     this->_originalFailed = true;
 
     pTile = pTile->getParent();
@@ -148,6 +164,16 @@ RasterOverlayTile::MoreDetailAvailable RasterMappedTo3DTile::update(
 
       // Compute the translation and scale for the new tile.
       this->computeTranslationAndScale(tile);
+    } else if (
+        pCandidate == nullptr && this->_pReadyTile == nullptr &&
+        this->_pLoadingTile->getState() ==
+            RasterOverlayTile::LoadState::Failed) {
+      // This overlay tile failed to load, and there are no better candidates
+      // available. So mark this failed tile ready so that it doesn't block the
+      // entire tileset from rendering.
+      this->_pReadyTile = this->_pLoadingTile;
+      this->_pLoadingTile = nullptr;
+      this->_state = AttachmentState::Attached;
     }
   }
 
@@ -168,7 +194,7 @@ RasterOverlayTile::MoreDetailAvailable RasterMappedTo3DTile::update(
                                        : AttachmentState::Attached;
   }
 
-  assert(this->_pLoadingTile != nullptr || this->_pReadyTile != nullptr);
+  CESIUM_ASSERT(this->_pLoadingTile != nullptr || this->_pReadyTile != nullptr);
 
   // TODO: check more precise raster overlay tile availability, rather than just
   // max level?
@@ -200,11 +226,15 @@ void RasterMappedTo3DTile::detachFromTile(
     return;
   }
 
-  prepareRendererResources.detachRasterInMainThread(
-      tile,
-      this->getTextureCoordinateID(),
-      *this->_pReadyTile,
-      this->_pReadyTile->getRendererResources());
+  // Failed tiles aren't attached with the renderer, so don't detach them,
+  // either.
+  if (this->_pReadyTile->getState() != RasterOverlayTile::LoadState::Failed) {
+    prepareRendererResources.detachRasterInMainThread(
+        tile,
+        this->getTextureCoordinateID(),
+        *this->_pReadyTile,
+        this->_pReadyTile->getRendererResources());
+  }
 
   this->_state = AttachmentState::Unattached;
 }
@@ -256,41 +286,6 @@ int32_t addProjectionToList(
   }
 }
 
-glm::dvec2 computeDesiredScreenPixels(
-    const Tile& tile,
-    const Projection& projection,
-    const Rectangle& rectangle,
-    double maxHeight,
-    double maximumScreenSpaceError,
-    const Ellipsoid& ellipsoid = Ellipsoid::WGS84) {
-  // We're aiming to estimate the maximum number of pixels (in each projected
-  // direction) the tile will occupy on the screen. The will be determined by
-  // the tile's geometric error, because when less error is needed (i.e. the
-  // viewer moved closer), the LOD will switch to show the tile's children
-  // instead of this tile.
-  //
-  // It works like this:
-  // * Estimate the size of the projected rectangle in world coordinates.
-  // * Compute the distance at which tile will switch to its children, based on
-  // its geometric error and the tileset SSE.
-  // * Compute the on-screen size of the projected rectangle at that distance.
-  //
-  // For the two compute steps, we use the usual perspective projection SSE
-  // equation:
-  // screenSize = (realSize * viewportHeight) / (distance * 2 * tan(0.5 * fovY))
-  //
-  // Conveniently a bunch of terms cancel out, so the screen pixel size at the
-  // switch distance is not actually dependent on the screen dimensions or
-  // field-of-view angle.
-  double geometryError = tile.getNonZeroGeometricError();
-  glm::dvec2 diameters = computeProjectedRectangleSize(
-      projection,
-      rectangle,
-      maxHeight,
-      ellipsoid);
-  return diameters * maximumScreenSpaceError / geometryError;
-}
-
 RasterMappedTo3DTile* addRealTile(
     Tile& tile,
     RasterOverlayTileProvider& provider,
@@ -303,7 +298,8 @@ RasterMappedTo3DTile* addRealTile(
     return nullptr;
   } else {
     return &tile.getMappedRasterTiles().emplace_back(
-        RasterMappedTo3DTile(pTile, textureCoordinateIndex));
+        pTile,
+        textureCoordinateIndex);
   }
 }
 
@@ -314,22 +310,14 @@ RasterMappedTo3DTile* addRealTile(
     RasterOverlayTileProvider& tileProvider,
     RasterOverlayTileProvider& placeholder,
     Tile& tile,
-    std::vector<Projection>& missingProjections) {
+    std::vector<Projection>& missingProjections,
+    const CesiumGeospatial::Ellipsoid& ellipsoid) {
   if (tileProvider.isPlaceholder()) {
     // Provider not created yet, so add a placeholder tile.
     return &tile.getMappedRasterTiles().emplace_back(
-        RasterMappedTo3DTile(getPlaceholderTile(placeholder), -1));
+        getPlaceholderTile(placeholder),
+        -1);
   }
-
-  // We can get a more accurate estimate of the real-world size of the projected
-  // rectangle if we consider the rectangle at the true height of the geometry
-  // rather than assuming it's on the ellipsoid. This will make basically no
-  // difference for small tiles (because surface normals on opposite ends of
-  // tiles are effectively identical), and only a small difference for large
-  // ones (because heights will be small compared to the total size of a large
-  // tile). So we're skipping this complexity for now and estimating geometry
-  // width/height as if it's on the ellipsoid surface.
-  const double heightForSizeEstimation = 0.0;
 
   const Projection& projection = tileProvider.getProjection();
 
@@ -345,13 +333,13 @@ RasterMappedTo3DTile* addRealTile(
       // We have a rectangle and texture coordinates for this projection.
       int32_t index =
           int32_t(pRectangle - &overlayDetails.rasterOverlayRectangles[0]);
-      const glm::dvec2 screenPixels = computeDesiredScreenPixels(
-          tile,
-          projection,
-          *pRectangle,
-          heightForSizeEstimation,
-          maximumScreenSpaceError,
-          Ellipsoid::WGS84);
+      const glm::dvec2 screenPixels =
+          RasterOverlayUtilities::computeDesiredScreenPixels(
+              tile.getNonZeroGeometricError(),
+              maximumScreenSpaceError,
+              projection,
+              *pRectangle,
+              ellipsoid);
       return addRealTile(tile, tileProvider, *pRectangle, screenPixels, index);
     } else {
       // We don't have a precise rectangle for this projection, which means the
@@ -361,9 +349,9 @@ RasterMappedTo3DTile* addRealTile(
           int32_t(overlayDetails.rasterOverlayProjections.size());
       int32_t textureCoordinateIndex =
           existingIndex + addProjectionToList(missingProjections, projection);
-      return &tile.getMappedRasterTiles().emplace_back(RasterMappedTo3DTile(
+      return &tile.getMappedRasterTiles().emplace_back(
           getPlaceholderTile(placeholder),
-          textureCoordinateIndex));
+          textureCoordinateIndex);
     }
   }
 
@@ -375,13 +363,13 @@ RasterMappedTo3DTile* addRealTile(
           tileProvider.getProjection(),
           tile.getBoundingVolume());
   if (maybeRectangle) {
-    const glm::dvec2 screenPixels = computeDesiredScreenPixels(
-        tile,
-        projection,
-        *maybeRectangle,
-        heightForSizeEstimation,
-        maximumScreenSpaceError,
-        Ellipsoid::WGS84);
+    const glm::dvec2 screenPixels =
+        RasterOverlayUtilities::computeDesiredScreenPixels(
+            tile.getNonZeroGeometricError(),
+            maximumScreenSpaceError,
+            projection,
+            *maybeRectangle,
+            ellipsoid);
     return addRealTile(
         tile,
         tileProvider,
@@ -390,16 +378,16 @@ RasterMappedTo3DTile* addRealTile(
         textureCoordinateIndex);
   } else {
     // No precise rectangle yet, so return a placeholder for now.
-    return &tile.getMappedRasterTiles().emplace_back(RasterMappedTo3DTile(
+    return &tile.getMappedRasterTiles().emplace_back(
         getPlaceholderTile(placeholder),
-        textureCoordinateIndex));
+        textureCoordinateIndex);
   }
 }
 
 void RasterMappedTo3DTile::computeTranslationAndScale(const Tile& tile) {
   if (!this->_pReadyTile) {
     // This shouldn't happen
-    assert(false);
+    CESIUM_ASSERT(false);
     return;
   }
 
@@ -436,17 +424,13 @@ void RasterMappedTo3DTile::computeTranslationAndScale(const Tile& tile) {
   const CesiumGeometry::Rectangle imageryRectangle =
       this->_pReadyTile->getRectangle();
 
-  const double terrainWidth = geometryRectangle.computeWidth();
-  const double terrainHeight = geometryRectangle.computeHeight();
+  glm::dvec4 translationAndScale =
+      RasterOverlayUtilities::computeTranslationAndScale(
+          geometryRectangle,
+          imageryRectangle);
 
-  const double scaleX = terrainWidth / imageryRectangle.computeWidth();
-  const double scaleY = terrainHeight / imageryRectangle.computeHeight();
-  this->_translation = glm::dvec2(
-      (scaleX * (geometryRectangle.minimumX - imageryRectangle.minimumX)) /
-          terrainWidth,
-      (scaleY * (geometryRectangle.minimumY - imageryRectangle.minimumY)) /
-          terrainHeight);
-  this->_scale = glm::dvec2(scaleX, scaleY);
+  this->_translation = glm::dvec2(translationAndScale.x, translationAndScale.y);
+  this->_scale = glm::dvec2(translationAndScale.z, translationAndScale.w);
 }
 
 } // namespace Cesium3DTilesSelection

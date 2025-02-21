@@ -1,11 +1,11 @@
 #pragma once
 
-#include "CesiumGltf/Class.h"
-#include "CesiumGltf/ClassProperty.h"
-#include "CesiumGltf/ExtensionModelExtStructuralMetadata.h"
-#include "CesiumGltf/PropertyAttribute.h"
-#include "CesiumGltf/PropertyAttributePropertyView.h"
-#include "Model.h"
+#include <CesiumGltf/Class.h>
+#include <CesiumGltf/ClassProperty.h>
+#include <CesiumGltf/ExtensionModelExtStructuralMetadata.h>
+#include <CesiumGltf/Model.h>
+#include <CesiumGltf/PropertyAttribute.h>
+#include <CesiumGltf/PropertyAttributePropertyView.h>
 
 namespace CesiumGltf {
 /**
@@ -38,8 +38,26 @@ enum class PropertyAttributeViewStatus {
   ErrorClassNotFound
 };
 
+/**
+ * @brief Attempts to obtain a \ref PropertyType from the \ref Accessor::type
+ * "type" field of the accessor.
+ *
+ * @param accessor The accessor whose type will be obtained.
+ * @returns A \ref PropertyType equivalent to the accessor's \ref
+ * AccessorSpec::type, or \ref PropertyType::Invalid if no conversion could be
+ * made.
+ */
 PropertyType getAccessorTypeAsPropertyType(const Accessor& accessor);
 
+/**
+ * @brief Attempts to obtain a \ref PropertyComponentType from the \ref
+ * Accessor::componentType "componentType" field of the accessor.
+ *
+ * @param accessor The accessor whose componentType will be obtained.
+ * @returns A \ref PropertyComponentType equivalent to the accessor's \ref
+ * AccessorSpec::componentType, or \ref PropertyComponentType::None if no
+ * conversion could be made.
+ */
 PropertyComponentType
 getAccessorComponentTypeAsPropertyComponentType(const Accessor& accessor);
 
@@ -105,12 +123,12 @@ public:
    * This method will validate the EXT_structural_metadata format to ensure
    * {@link PropertyAttributePropertyView} retrieves the correct data. T must
    * be a scalar with a supported component type (int8_t, uint8_t, int16_t,
-   * uint16_t, uint32_t, float), a glm vecN composed of one of the scalar types,
+   * uint16_t, float), a glm vecN composed of one of the scalar types,
    * or a glm matN containing one of the scalar types.
    *
    * If T does not match the type specified by the class property, this returns
    * an invalid PropertyAttributePropertyView. Likewise, if the value of
-   * Normalized does not match the value of {@ClassProperty::normalized} for that
+   * Normalized does not match the value of {@link ClassProperty::normalized} for that
    * class property, this returns an invalid property view. Only types with
    * integer components may be normalized.
    *
@@ -151,13 +169,13 @@ public:
 
   /**
    * @brief Gets a {@link PropertyAttributePropertyView} through a callback that accepts a
-   * property id and a {@link PropertyAttributePropertyView<T>} that views the data
+   * property id and a {@link PropertyAttributePropertyView} that views the data
    * of the property with the specified id.
    *
    * This method will validate the EXT_structural_metadata format to ensure
    * {@link PropertyAttributePropertyView} retrieves the correct data. T must
    * be a scalar with a supported component type (int8_t, uint8_t, int16_t,
-   * uint16_t, uint32_t, float), a glm vecN composed of one of the scalar types,
+   * uint16_t, float), a glm vecN composed of one of the scalar types,
    * or a glm matN containing one of the scalar types.
    *
    * If the property is somehow invalid, an empty {@link PropertyAttributePropertyView}
@@ -166,8 +184,9 @@ public:
    *
    * @param primitive The target primitive
    * @param propertyId The id of the property to retrieve data from
-   * @tparam callback A callback function that accepts a property id and a
-   * {@link PropertyAttributePropertyView<T>}
+   * @param callback A callback function that accepts a property id and a
+   * {@link PropertyAttributePropertyView}
+   * @tparam Callback The type of the callback function.
    */
   template <typename Callback>
   void getPropertyView(
@@ -286,22 +305,23 @@ public:
 
   /**
    * @brief Iterates over each property in the {@link PropertyAttribute} with a callback
-   * that accepts a property id and a {@link PropertyAttributePropertyView<T>} to view
+   * that accepts a property id and a {@link PropertyAttributePropertyView} to view
    * the data stored in the {@link PropertyAttributeProperty}.
    *
    * This method will validate the EXT_structural_metadata format to ensure
    * {@link PropertyAttributePropertyView} retrieves the correct data. T must be
    * a scalar with a supported component type (int8_t, uint8_t, int16_t,
-   * uint16_t, uint32_t, float), a glm vecN composed of one of the scalar types,
+   * uint16_t, float), a glm vecN composed of one of the scalar types,
    * or a PropertyArrayView containing one of the scalar types.
    *
    * If the property is invalid, an empty {@link PropertyAttributePropertyView} with an
    * error status will be passed to the callback. Otherwise, a valid property
    * view will be passed to the callback.
    *
-   * @param propertyId The id of the property to retrieve data from
-   * @tparam callback A callback function that accepts property id and
-   * {@link PropertyAttributePropertyView<T>}
+   * @param primitive The id of the property to retrieve data from
+   * @param callback A callback function that accepts property id and
+   * {@link PropertyAttributePropertyView}
+   * @tparam Callback The type of the callback function.
    */
   template <typename Callback>
   void
@@ -412,14 +432,6 @@ private:
               propertyId,
               classProperty));
       break;
-    case PropertyComponentType::Uint32:
-      callback(
-          propertyId,
-          getPropertyViewImpl<uint32_t, Normalized>(
-              primitive,
-              propertyId,
-              classProperty));
-      break;
     case PropertyComponentType::Float32:
       callback(
           propertyId,
@@ -473,14 +485,6 @@ private:
       callback(
           propertyId,
           getPropertyViewImpl<glm::vec<N, uint16_t>, Normalized>(
-              primitive,
-              propertyId,
-              classProperty));
-      break;
-    case PropertyComponentType::Uint32:
-      callback(
-          propertyId,
-          getPropertyViewImpl<glm::vec<N, uint32_t>, Normalized>(
               primitive,
               propertyId,
               classProperty));
@@ -581,14 +585,6 @@ private:
       callback(
           propertyId,
           getPropertyViewImpl<glm::mat<N, N, uint16_t>, Normalized>(
-              primitive,
-              propertyId,
-              classProperty));
-      break;
-    case PropertyComponentType::Uint32:
-      callback(
-          propertyId,
-          getPropertyViewImpl<glm::mat<N, N, uint32_t>, Normalized>(
               primitive,
               propertyId,
               classProperty));
